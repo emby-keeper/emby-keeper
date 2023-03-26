@@ -57,7 +57,7 @@ def prepare_config(config=None):
     proxy = config.get("proxy", None)
     if proxy:
         proxy.setdefault("scheme", "socks5")
-        proxy.setdefault("hostname", "127.0.0.1")
+        proxy.setdefault("host", "127.0.0.1")
         proxy.setdefault("port", "1080")
     return config
 
