@@ -7,7 +7,7 @@ class PeachCheckin(BotCheckin):
     name = "Peach"
     bot_username = "peach_emby_bot"
     bot_checkin_cmd = "/start"
-    bot_captcha_len = 4
+    bot_captcha_len = [2,3,4]
     bot_checkin_caption_pat = "请输入验证码"
 
     async def message_handler(self, client, message: Message):
