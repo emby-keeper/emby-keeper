@@ -9,6 +9,7 @@ from pyrogram.raw.functions.users import GetFullUser
 
 from ...utils import remove_prefix
 from .base import BaseBotCheckin
+from ..captcha.yescaptcha import YesCaptcha
 
 
 class NebulaCheckin(BaseBotCheckin):
@@ -61,15 +62,29 @@ class NebulaCheckin(BaseBotCheckin):
             await self.client.invoke(RequestWebView(peer=bot_peer, bot=bot_peer, platform="ios", url=url))
         ).url
         scheme = urlparse(url_auth)
+        token = ''
+        websiteKey = "0x4AAAAAAADGwT_-TpuCDrw9"
+        websiteURL = "https://web.nebula-emby.com/"
+        if self.captcha_service == 'yescaptcha':
+            task_type = "TurnstileTaskProxylessM1"
+            clientKey = self.captcha_service_key
+            yc = YesCaptcha(clientKey=clientKey, websiteKey=websiteKey, websiteURL=websiteURL, task_type=task_type)
+            try:
+                token = await yc.solve()
+            except Exception as e:
+                self.log.warning(f"接收到异常返回信息: {e}")
+            else:
+                self.log.info("验证码获取成功.")
         data = remove_prefix(scheme.fragment, "tgWebAppData=")
-        user_checkin_url = scheme._replace(path="/api/proxy/userCheckIn", query=f"data={data}").geturl()
+        user_checkin_url = scheme._replace(path="/api/proxy/userCheckIn", query=f"data={data}&token={token}").geturl()
         async with ClientSession(connector=self.connector) as session:
             async with session.get(user_checkin_url) as resp:
                 check_results = await resp.json()
             message = check_results["message"]
             if "失败" in message:
                 self.log.info("签到失败, 正在重试.")
-                await self.retry()
+                self.finished.set()
+#                 await self.retry()
             if "重复" in message:
                 self.log.info("今日已经签到过了.")
                 self.finished.set()
@@ -79,4 +94,6 @@ class NebulaCheckin(BaseBotCheckin):
                 )
                 self.finished.set()
             else:
+                if "验证失败" in message:
+                    message = message + '，建议前往设置验证码识别 ( https://github.com/embykeeper/embykeeper/blob/main/README.md#%E9%85%8D%E7%BD%AE%E9%A1%B9 )'
                 self.log.warning(f"接收到异常返回信息: {message}")

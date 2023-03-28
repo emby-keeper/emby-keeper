@@ -29,11 +29,13 @@ class MessageType(Flag):
 class BaseBotCheckin(ABC):
     name = __name__
 
-    def __init__(self, client: Client, retries=10, timeout=60, nofail=True):
+    def __init__(self, client: Client, retries=10, timeout=60, nofail=True, captcha_service='disabled', captcha_service_key='empty'):
         self.client = client
         self.retries = retries
         self.timeout = timeout
         self.nofail = nofail
+        self.captcha_service = captcha_service
+        self.captcha_service_key = captcha_service_key
         self.finished = asyncio.Event()
         self.log = logger.bind(scheme="telechecker", name=self.name, username=self.client.me.first_name)
 
@@ -146,6 +148,7 @@ class BotCheckin(BaseBotCheckin):
     async def send_checkin(self):
         for cmd in to_iterable(self.bot_checkin_cmd):
             await self.send(cmd)
+            await asyncio.sleep(5)
 
     async def _message_handler(self, *args, **kw):
         try:

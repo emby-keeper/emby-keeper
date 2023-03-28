@@ -12,6 +12,8 @@ def check_config(config):
             Optional("concurrent"): PositiveInt(),
             Optional("random"): PositiveInt(),
             Optional("nofail"): bool,
+            Optional("captcha_service"): Use(str),
+            Optional("captcha_service_key"): Use(str),
             Optional("proxy"): Schema(
                 {
                     Optional("hostname"): Regex(
@@ -75,6 +77,8 @@ def get_faked_config():
         "port": "1080",
         "scheme": "socks5",
     }
+    account["captcha_service"] = 'disabled'
+    account["captcha_service_key"] = uuid.uuid4().hex
     account["telegram"] = []
     for _ in range(2):
         account["telegram"].append(
