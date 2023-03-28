@@ -125,6 +125,8 @@ tmux a
 | `retries`    | `int`  | Telegram机器人签到错误重试次数              | `10` |
 | `concurrent` | `int`  | Telegram机器人签到最大并发                  | `2`  |
 | `random`     | `int`  | Telegram机器人签到定时任务时间随机量 (分钟) | `15` |
+| `captcha_service`     | `str`  | Nebula 签到所使用的验证码服务 [#5](https://github.com/embykeeper/embykeeper/pull/5)  | `disabled` |
+| `captcha_service_key`     | `str`  | Nebula 签到所使用的验证码服务秘钥 | `empty` |
 | `proxy`      | `dict` | 代理设置                                    | `{}` |
 | `telegram`   | `list` | Telegram账号设置 (支持多账号)               | `[]` |
 | `emby`       | `list` | Emby账号设置 (支持多账号)                   | `[]` |
