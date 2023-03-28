@@ -23,14 +23,13 @@ from .tele import Client, ClientsSession
 logger = logger.bind(scheme="telegram")
 
 CHECKINERS = [
+    NebulaCheckin,
     PeachCheckin,
     SingularityCheckin,
     LJYYCheckin,
     TerminusCheckin,
-    NebulaCheckin,
     JMSCheckin,
     BlueseaCheckin,
-    JMSIPTVCheckin,
     EmbyHubCheckin,
 ]
 
@@ -124,6 +123,8 @@ async def checkiner(config, instant=False):
                     retries=config.get("retries", 10),
                     timeout=config.get("timeout", 60),
                     nofail=config.get("nofail", True),
+                    captcha_service=config.get("captcha_service", 'disabled'),
+                    captcha_service_key=config.get("captcha_service_key", 'empty'),
                 )
                 for cls in extract(CHECKINERS)
             ]
