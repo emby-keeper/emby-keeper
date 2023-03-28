@@ -27,13 +27,16 @@ async def login(config):
             jellyfin=a.get("jellyfin", False),
             proxy=config.get("proxy", None),
         )
-        info = await emby.info()
-        if info:
-            loggeruser = logger.bind(server=info["ServerName"], username=a["username"])
-            loggeruser.info(f'成功登录 ({"Jellyfin" if a.get("jellyfin", False) else "Emby"} {info["Version"]}).')
-            yield emby, a.get("time", 800), a.get("progress", 1000), loggeruser
-        else:
-            logger.error(f'Emby ({a["url"]}) 无法获取元信息而跳过, 请重新检查配置.')
+        try:
+            info = await emby.info()
+            if info:
+                loggeruser = logger.bind(server=info["ServerName"], username=a["username"])
+                loggeruser.info(f'成功登录 ({"Jellyfin" if a.get("jellyfin", False) else "Emby"} {info["Version"]}).')
+                yield emby, a.get("time", 800), a.get("progress", 1000), loggeruser
+            else:
+                logger.error(f'Emby ({a["url"]}) 无法获取元信息而跳过, 请重新检查配置.')
+        except Exception as e:
+            logger.error(f'Emby ({a["url"]}) maybe down.')
 
 
 async def watch(emby, time, progress, logger):
