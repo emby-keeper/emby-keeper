@@ -62,7 +62,7 @@ class NebulaCheckin(BaseBotCheckin):
         ).url
         scheme = urlparse(url_auth)
         data = remove_prefix(scheme.fragment, "tgWebAppData=")
-        user_checkin_url = scheme._replace(path="/api/userCheckIn", query=f"data={data}").geturl()
+        user_checkin_url = scheme._replace(path="/api/proxy/userCheckIn", query=f"data={data}").geturl()
         async with ClientSession(connector=self.connector) as session:
             async with session.get(user_checkin_url) as resp:
                 check_results = await resp.json()
