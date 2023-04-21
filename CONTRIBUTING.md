@@ -12,7 +12,7 @@
     ```
 
 4. 安装所有 requirements:
-   
+
    ```bash
     pip install -r requirements_dev.txt
     pip install -e .
