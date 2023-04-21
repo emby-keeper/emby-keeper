@@ -64,6 +64,7 @@ content-type = "text/markdown"
 embykeeper = "embykeeper.cli:app"
 
 [tool.setuptools]
+packages = ["embykeeper"]
 zip-safe = false
 
 [tool.bumpversion]
