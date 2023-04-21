@@ -69,7 +69,7 @@ def check_config(config):
 def write_faked_config(path):
     import uuid
 
-    from tomlkit import document, nl, comment, item, dump, table
+    from tomlkit import document, nl, comment, item, dump
     from faker import Faker
     from faker.providers import internet, profile
 
@@ -78,11 +78,11 @@ def write_faked_config(path):
 
     logger.warning("需要输入一个toml格式的config文件.")
     logger.warning(f'您可以根据生成的参考配置文件 "{path}" 进行配置')
-
+    
     fake = Faker()
     fake.add_provider(internet)
     fake.add_provider(profile)
-
+    
     doc = document()
     doc.add(comment("This is an example config file."))
     doc.add(comment("Please fill in your account information."))
@@ -161,7 +161,6 @@ def write_faked_config(path):
     doc["emby"] = emby
     with open(path, "w+") as f:
         dump(doc, f)
-
 
 def prepare_config(config=None):
     default_config = "config.toml"

@@ -1,6 +1,7 @@
 import asyncio
 from collections import namedtuple
 from functools import wraps
+import sys
 from typing import Any, Iterable, Union
 
 from loguru import logger
@@ -32,8 +33,8 @@ class AsyncTyper(Typer):
                 except Exception as e:
                     print("\r", end="")
                     fail_message(e)
-                    raise Exit(1) from None
-
+                    sys.exit(1)
+                    
             self.command(*args, **kwargs)(sync_func)
             return async_func
 
