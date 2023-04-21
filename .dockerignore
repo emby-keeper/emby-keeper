@@ -12,7 +12,11 @@ images
 # Git
 .git
 .gitignore
+
+# Editor Config
 .editorconfig
+
+# Vscode
 .vscode
 
 # Local History for Visual Studio Code
