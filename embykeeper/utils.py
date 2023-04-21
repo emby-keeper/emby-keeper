@@ -2,7 +2,8 @@ import asyncio
 from collections import namedtuple
 from functools import wraps
 import sys
-from typing import Any, Iterable, Union
+from typing import Any, Union
+from collections.abc import Iterable
 
 from loguru import logger
 import click
@@ -115,7 +116,7 @@ class AsyncCountPool(dict):
             return key
 
 
-def to_iterable(var: Union[Iterable, Any]):
+def to_iterable(var: Iterable | Any):
     if var is None:
         return ()
     if isinstance(var, str) or not isinstance(var, Iterable):

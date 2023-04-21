@@ -19,7 +19,7 @@ class PornEmbyCheckin(AnswerBotCheckin):
     def get_handlers(self):
         return [*super().get_handlers(), DeletedMessagesHandler(self.messages_deleted_handler)]
 
-    async def messages_deleted_handler(self, client, messages: List[Message]):
+    async def messages_deleted_handler(self, client, messages: list[Message]):
         if self.message:
             for m in messages:
                 if self.message.id == m.id:

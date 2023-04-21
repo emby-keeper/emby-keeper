@@ -45,7 +45,7 @@ def get_spec(type: str):
     return sub, suffix
 
 
-def get_names(type: str) -> List[str]:
+def get_names(type: str) -> list[str]:
     sub, _ = get_spec(type)
     results = []
     typemodule = import_module(f"{__name__}.{sub}")
@@ -56,7 +56,7 @@ def get_names(type: str) -> List[str]:
     return results
 
 
-def get_cls(type: str, names: List[str] = None) -> List[Type]:
+def get_cls(type: str, names: list[str] = None) -> list[type]:
     sub, suffix = get_spec(type)
     if names == None:
         names = get_names(type)
@@ -69,7 +69,7 @@ def get_cls(type: str, names: List[str] = None) -> List[Type]:
     return results
 
 
-def extract(clss: List[Type]) -> List[Type]:
+def extract(clss: list[type]) -> list[type]:
     extracted = []
     for cls in clss:
         ncs = [c for c in cls.__dict__.values() if inspect.isclass(c)]
@@ -103,7 +103,7 @@ async def dump_message(client: Client, message: Message, table: Table):
     else:
         sender = sender_id = sender_icon = None
 
-    chat_id = "{: }".format(message.chat.id)
+    chat_id = f"{message.chat.id: }"
     if message.chat.type == ChatType.GROUP or message.chat.type == ChatType.SUPERGROUP:
         chat = message.chat.title
         chat_icon = "👥"

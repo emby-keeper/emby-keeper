@@ -5,7 +5,8 @@ import random
 import re
 from contextlib import asynccontextmanager
 import string
-from typing import List, Sized, Union
+from typing import List, Union
+from collections.abc import Sized
 
 from loguru import logger
 from pyrogram import filters
@@ -93,8 +94,8 @@ class Monitor:
     name: str = None  # 监控器名称
     chat_name: str = None  # 群聊名称
     chat_allow_outgoing: bool = False  # 是否支持自己发言触发
-    chat_user: Union[str, List[str]] = []  # 仅被列表中用户的发言触发
-    chat_keyword: Union[str, List[str]] = []  # 仅当消息含有列表中的关键词时触发, 支持 regex
+    chat_user: str | list[str] = []  # 仅被列表中用户的发言触发
+    chat_keyword: str | list[str] = []  # 仅当消息含有列表中的关键词时触发, 支持 regex
     chat_probability: float = 1.0  # 发信概率
     chat_delay: int = 0  # 发信延迟
     chat_follow_user: int = 0  # 需要等待 N 个用户发送 {chat_reply} 方可回复
@@ -250,7 +251,7 @@ class Monitor:
                         f'从众计数 ({self.chat_follow_user - now}/{self.chat_follow_user}): "{message.from_user.name}"'
                     )
 
-    async def on_trigger(self, message: Message, keys: Union[List[str], str], reply: str):
+    async def on_trigger(self, message: Message, keys: list[str] | str, reply: str):
         if reply:
             return await self.client.send_message(message.chat.id, reply)
 

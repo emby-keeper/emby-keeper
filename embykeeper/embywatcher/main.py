@@ -30,7 +30,7 @@ def is_ok(co):
 
 async def get_oldest(emby: Emby, n=10):
     items = await emby.get_items(["Movie", "Episode"], limit=n, sort="DateCreated")
-    i: Union[Movie, Episode]
+    i: Movie | Episode
     for i in items:
         yield i
 

@@ -17,7 +17,7 @@ repos:
       - id: check-symlinks
       - id: destroyed-symlinks
       - id: mixed-line-ending
-  
+
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.3.1
     hooks:
@@ -31,5 +31,3 @@ repos:
       - id: black
         exclude: tests/
         args: [--check]
-  
-  
