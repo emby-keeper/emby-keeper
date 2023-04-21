@@ -4,8 +4,7 @@ from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from enum import Flag, auto
 import string
-from typing import List, Union
-from collections.abc import Iterable
+from typing import Iterable, List, Union
 
 import ddddocr
 from loguru import logger
@@ -67,9 +66,9 @@ class BotCheckin(BaseBotCheckin):
     name: str = None  # 签到器的名称
     bot_id: int = None  # Bot 的 UserID
     bot_username: str = None  # Bot 的 用户名
-    bot_checkin_cmd: str | list[str] = ["/checkin"]  # Bot 依次执行的签到命令
+    bot_checkin_cmd: Union[str, List[str]] = ["/checkin"]  # Bot 依次执行的签到命令
     bot_checkin_caption_pat: str = None  # 当 Bot 返回图片时, 仅当符合该 regex 才识别为验证码
-    bot_text_ignore: str | list[str] = []  # 当含有列表中的关键词, 即忽略该消息
+    bot_text_ignore: Union[str, List[str]] = []  # 当含有列表中的关键词, 即忽略该消息
     bot_captcha_len: Iterable = range(2, 7)  # 验证码的可能范围
     bot_success_pat: str = r"(\d+)[^\d]*(\d+)"  # 当接收到成功消息后, 从消息中提取数字的模式
     bot_retry_wait: int = 2  # 失败时等待的秒数

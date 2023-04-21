@@ -2,8 +2,7 @@ import asyncio
 import random
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
-from typing import List, Union
-from collections.abc import Iterable
+from typing import Iterable, List, Union
 
 from dateutil import parser
 from loguru import logger
@@ -19,7 +18,7 @@ __ignore__ = True
 @dataclass
 class MessageSchedule:
     message: str
-    at: Iterable[str | time] | str | time = ("0:00", "23:59")
+    at: Union[Iterable[Union[str, time]], Union[str, time]] = ("0:00", "23:59")
     every: str = "days"
     possibility: float = 1.0
     only: str = None
@@ -28,7 +27,7 @@ class MessageSchedule:
 class Messager:
     name: str = None  # 水群器名称
     chat_name: str = None  # 群聊的名称
-    messages: list[str] = []  # 可用的话术列表
+    messages: List[str] = []  # 可用的话术列表
 
     def __init__(self, account, scheduler: Scheduler, username=None, nofail=True, proxy=None):
         self.account = account

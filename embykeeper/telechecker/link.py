@@ -1,8 +1,7 @@
 import asyncio
 import io
 import random
-from typing import List, Optional, Tuple
-from collections.abc import Callable
+from typing import Callable, List, Optional, Tuple
 import uuid
 
 import tomli
@@ -27,7 +26,7 @@ class Link:
         return uuid.UUID(int=rd.getrandbits(128))
 
     @staticmethod
-    async def delete_messages(messages: list[Message]):
+    async def delete_messages(messages: List[Message]):
         async def delete(m: Message):
             try:
                 await m.delete(revoke=True)
@@ -38,7 +37,7 @@ class Link:
 
     async def post(
         self, cmd, condition: Callable = None, timeout: int = 10, name: str = None
-    ) -> tuple[str | None, str | None]:
+    ) -> Tuple[Optional[str], Optional[str]]:
         results = {}
         ok = asyncio.Event()
         handler = self.get_handler(cmd, results, ok, condition)
@@ -63,7 +62,7 @@ class Link:
             return None
         else:
             await self.delete_messages(messages)
-            status, errmsg = (results.get(p, None) for p in ("status", "errmsg"))
+            status, errmsg = [results.get(p, None) for p in ("status", "errmsg")]
             if status == "error":
                 self.log.warning(f"{name}错误: {errmsg}.")
                 return None

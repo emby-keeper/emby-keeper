@@ -1,6 +1,5 @@
 import asyncio
-from typing import Optional, Union
-from collections.abc import AsyncGenerator
+from typing import AsyncGenerator, Optional, Union
 
 from rich.prompt import Prompt
 from appdirs import user_data_dir
@@ -17,7 +16,7 @@ from ..utils import to_iterable
 logger = logger.bind(scheme="telegram")
 
 
-def _name(self: types.User | types.Chat):
+def _name(self: Union[types.User, types.Chat]):
     return " ".join([n for n in (self.first_name, self.last_name) if n])
 
 
@@ -85,7 +84,7 @@ class Client(_Client):
 
     async def get_dialogs(
         self, limit: int = 0, exclude_pinned=None, folder_id=None
-    ) -> AsyncGenerator["types.Dialog", None] | None:
+    ) -> Optional[AsyncGenerator["types.Dialog", None]]:
         cache_id = f"dialogs_{self.phone_number}_{folder_id}_{1 if exclude_pinned else 0}"
         (offset_id, offset_date, offset_peer), cache = await self.cache.get(
             cache_id, ((0, 0, raw.types.InputPeerEmpty()), [])
