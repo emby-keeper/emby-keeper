@@ -58,6 +58,56 @@ Embykeeper 是一个在中文社群规则下用于 Emby 影视服务器的签到
 
 ## 安装与使用
 
+### 从 PyPi 安装
+
+Embykeeper 可以通过 `python` 运行, 您可以通过 [conda](https://github.com/conda/conda) 或 [virtualvenv](https://virtualenv.pypa.io/) 等工具进行环境的管理.
+
+您可以通过 `pip` 安装 `embykeeper` (需要 `python >= 3.7, < 3.11`):
+
+```bash
+pip install embykeeper
+```
+
+随后, 您需要执行:
+
+```bash
+embykeeper
+```
+
+命令将会在当前目录生成模板 `config.toml` 文件, 您需要修改您的账号配置 (详见[从 Docker 安装](https://github.com/embykeeper/embykeeper#%E4%BB%8E-docker-%E5%AE%89%E8%A3%85)).
+
+随后, 您需要再次执行:
+
+```bash
+embykeeper
+```
+
+您将被询问设备验证码以登录, 登录成功后, Embykeeper 将首先执行一次签到和保活, 然后启动群组监控和水群计划任务 (若启用).
+
+恭喜您！您已经成功部署了 Embykeeper, 为了让 Embykeeper 长期后台运行, 您可以通过`Ctrl+C`停止, 然后运行:
+
+```bash
+tmux
+```
+
+这将启动一个 `tmux` 终端, 您可以在该终端中运行上述命令 (`embykeeper config.toml`), 并按 Ctrl + B, 松开 B 再按 D, 以脱离 `tmux` 终端.
+
+您随时可以通过运行:
+
+```bash
+tmux a
+```
+
+以重新连接到 `tmux` 终端.
+
+当版本更新时, 您需要执行:
+
+```
+pip install -U embykeeper
+```
+
+然后重新运行应用.
+
 ### 从 Docker 安装
 
 Embykeeper 可以通过 `docker` 运行, 您需 [安装 docker](https://yeasy.gitbook.io/docker_practice/install), 然后执行:
@@ -126,56 +176,6 @@ services:
 您可以通过 `docker logs -f embykeeper` 或 `docker-compose logs -f embykeeper` 以查看最新日志.
 
 如果您需要使用主机上的代理服务器 (例如 `https://localhost:1080`), 您可能需要使用 `--net=host` 参数以使用主机网络模式.
-
-### 从 PyPi 安装
-
-Embykeeper 可以通过 `python` 运行, 您可以通过 [conda](https://github.com/conda/conda) 或 [virtualvenv](https://virtualenv.pypa.io/) 等工具进行环境的管理.
-
-您可以通过 `pip` 安装 `embykeeper` (需要 `python >= 3.7, < 3.11`):
-
-```bash
-pip install embykeeper
-```
-
-随后, 您需要执行:
-
-```bash
-embykeeper
-```
-
-命令将会在当前目录生成模板 `config.toml` 文件, 您需要修改您的账号配置 (详见[从 Docker 安装](https://github.com/embykeeper/embykeeper#%E4%BB%8E-docker-%E5%AE%89%E8%A3%85)).
-
-随后, 您需要再次执行:
-
-```bash
-embykeeper
-```
-
-您将被询问设备验证码以登录, 登录成功后, Embykeeper 将首先执行一次签到和保活, 然后启动群组监控和水群计划任务 (若启用).
-
-恭喜您！您已经成功部署了 Embykeeper, 为了让 Embykeeper 长期后台运行, 您可以通过`Ctrl+C`停止, 然后运行:
-
-```bash
-tmux
-```
-
-这将启动一个 `tmux` 终端, 您可以在该终端中运行上述命令 (`embykeeper config.toml`), 并按 Ctrl + B, 松开 B 再按 D, 以脱离 `tmux` 终端.
-
-您随时可以通过运行:
-
-```bash
-tmux a
-```
-
-以重新连接到 `tmux` 终端.
-
-当版本更新时, 您需要执行:
-
-```
-pip install -U embykeeper
-```
-
-然后重新运行应用.
 
 ### 从源码构建
 
