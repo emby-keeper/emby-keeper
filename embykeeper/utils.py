@@ -34,7 +34,7 @@ class AsyncTyper(Typer):
                     print("\r", end="")
                     fail_message(e)
                     sys.exit(1)
-                    
+
             self.command(*args, **kwargs)(sync_func)
             return async_func
 

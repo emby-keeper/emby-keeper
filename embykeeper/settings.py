@@ -5,8 +5,8 @@ from loguru import logger
 import tomli as tomllib
 from schema import And, Optional, Or, Regex, Schema, SchemaError, Use
 
+
 def check_config(config):
-    
     PositiveInt = lambda: And(Use(int), lambda n: n > 0)
     schema = Schema(
         {
@@ -78,11 +78,11 @@ def write_faked_config(path):
 
     logger.warning("需要输入一个toml格式的config文件.")
     logger.warning(f'您可以根据生成的参考配置文件 "{path}" 进行配置')
-    
+
     fake = Faker()
     fake.add_provider(internet)
     fake.add_provider(profile)
-    
+
     doc = document()
     doc.add(comment("This is an example config file."))
     doc.add(comment("Please fill in your account information."))
@@ -161,6 +161,7 @@ def write_faked_config(path):
     doc["emby"] = emby
     with open(path, "w+") as f:
         dump(doc, f)
+
 
 def prepare_config(config_file=None):
     default_config_file = Path("config.toml")
