@@ -1,11 +1,24 @@
 name: CI
 
 on:
-  - push
-  - pull_request
+  push:
+    paths-ignore:
+      - "*.md"
+  pull_request:
+    paths-ignore:
+      - "*.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  main:
+    if:
+      github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     strategy:
       matrix:

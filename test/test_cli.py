@@ -3,7 +3,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 import tomli as tomllib
-from tomlkit import dump
+import tomlkit
 import pytest
 
 import embykeeper
@@ -28,24 +28,57 @@ def test_version():
     assert embykeeper.__version__ in result.stdout
     assert result.exit_code == 0
 
-def test_check_config(in_temp_dir: Path):
-    config = {'telegram': {k: 'Test' for k in ('api_id', 'api_hash', 'phone')}}
-    with open('config.toml', 'wb') as f:
-        dump(config, f)
-    result = runner.invoke(app)
-    assert result.exit_code == 251
-    assert '配置文件错误' in result.stderr
-
 def test_create_config(in_temp_dir: Path):
     result = runner.invoke(app)
-    assert result.exit_code == 250
     assert '生成' in result.stderr
+    assert result.exit_code == 250
     assert Path("config.toml").exists()
     with open("config.toml", 'rb') as f:
         config = tomllib.load(f)
-    assert check_config(config)
+    assert not check_config(config)
+
+def test_create_config_empty(in_temp_dir: Path):
+    config_file = Path("config.toml")
     
-def test_fail():
-    result = runner.invoke(app, ['nonexisting.toml'])
-    assert result.exit_code == 1
-    assert '关键错误' in result.stderr
+    config_file.touch()
+    result = runner.invoke(app, [str(config_file)])
+    assert '生成' in result.stderr
+    assert result.exit_code == 250
+    with open("config.toml", 'rb') as f:
+        config = tomllib.load(f)
+    assert config
+    
+    config_file.unlink()
+    config_file.touch()
+    result = runner.invoke(app)
+    assert '生成' in result.stderr
+    assert result.exit_code == 250
+    with open("config.toml", 'rb') as f:
+        config = tomllib.load(f)
+    assert config
+    
+    config_file = Path("empty.toml")
+    config_file.touch()
+    result = runner.invoke(app, [str(config_file), "--once"])
+    assert '生成' not in result.stderr
+    assert result.exit_code == 0
+    
+def test_nonexist_config(in_temp_dir: Path):
+    for fn in ('config.toml', 'nonexisting.toml'):
+        result = runner.invoke(app, [fn])
+        assert '不存在' in result.stderr
+        assert result.exit_code == 251
+
+def test_check_config(in_temp_dir: Path):
+    with open('config.toml', 'w+') as f:
+        f.write('notifier: true')
+    result = runner.invoke(app)
+    assert '配置文件错误' in result.stderr
+    assert result.exit_code == 252
+    
+    config = {'telegram': {k: 'Test' for k in ('api_id', 'api_hash', 'phone')}}
+    with open('config.toml', 'w+') as f:
+        tomlkit.dump(config, f)
+    result = runner.invoke(app)
+    assert '配置文件错误' in result.stderr
+    assert result.exit_code == 253

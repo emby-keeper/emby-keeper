@@ -86,7 +86,7 @@ username = "carrie19"
 password = "s*D7MMCpS$"
 ```
 
-对于 Telegram 而言, 您可以通过 [Telegram 官网](https://my.telegram.org/) 申请 `api_id` 和 `api_hash`. 登陆后选择 `API development tools`, 随后应用信息可以随意填写, 请注意 `URL` 是必填项, 可以填写 `localhost`. 提交时若显示 "Error", 您可能需要更换应用名称/短名称/代理/清除浏览器记录并重试.
+对于 Telegram 而言, 您可以通过 [Telegram 官网](https://my.telegram.org/) 申请 `api_id` 和 `api_hash`. 登陆后选择 `API development tools`, 随后应用信息可以随意填写, 请注意 `URL` 是必填项, 可以填写 `localhost`. 提交时若显示 "Error", 您可能需要再次多次点击提交, 或等待新账户脱离风控期/更换代理/清除浏览器记录并重试.
 
 随后, 您需要再次执行:
 
@@ -129,7 +129,7 @@ services:
 
 ### 从 PyPi 安装
 
-Embykeeper 需要 Python 环境以运行, 您可以通过 [conda](https://github.com/conda/conda) 或 [virtualvenv](https://virtualenv.pypa.io/) 等工具进行环境的管理.
+Embykeeper 可以通过 `python` 运行, 您可以通过 [conda](https://github.com/conda/conda) 或 [virtualvenv](https://virtualenv.pypa.io/) 等工具进行环境的管理.
 
 您可以通过 `pip` 安装 `embykeeper` (需要 `python >= 3.7, < 3.11`):
 

@@ -85,13 +85,7 @@ async def main(
 
     initialize(level="DEBUG" if debug else "INFO")
 
-    try:
-        config = prepare_config(config)
-    except tomllib.TOMLDecodeError as e:
-        logger.error(f"TOML 配置文件错误: {e}.")
-        sys.exit(251)
-    if not config:
-        sys.exit(250)
+    config: dict = prepare_config(config)
 
     if debug:
         config.setdefault("nofail", False)
@@ -105,7 +99,7 @@ async def main(
         emby = 7
         monitor = True
         send = True
-
+    
     logger.info(f"欢迎使用 [orange3]{__name__.capitalize()}[/]! 正在启动, 请稍等. 您可以通过 Ctrl+C 以结束运行.")
     logger.info(f'当前版本 ({__version__}) 活跃贡献者: {", ".join(__author__)}.')
 

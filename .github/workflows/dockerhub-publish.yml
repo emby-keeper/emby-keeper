@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  main:
     runs-on: ubuntu-latest
     steps:
       -
@@ -24,8 +24,13 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       -
+        name: Set version tag
+        run:
+          echo "GIT_TAG=$(git describe --candidates=0 --tags 2> /dev/null)" >> $GITHUB_ENV
+      -
         name: Build and push
         uses: docker/build-push-action@v4
         with:
           push: true
-          tags: embykeeper/embykeeper:latest
+          platforms: linux/amd64,linux/arm64
+          tags: embykeeper/embykeeper:latest,embykeeper/embykeeper:${{ env.GIT_TAG }}

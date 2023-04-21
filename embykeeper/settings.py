@@ -1,12 +1,12 @@
 from pathlib import Path
+import sys
 from loguru import logger
 
 import tomli as tomllib
-
+from schema import And, Optional, Or, Regex, Schema, SchemaError, Use
 
 def check_config(config):
-    from schema import And, Optional, Or, Regex, Schema, SchemaError, Use
-
+    
     PositiveInt = lambda: And(Use(int), lambda n: n > 0)
     schema = Schema(
         {
@@ -61,9 +61,9 @@ def check_config(config):
     try:
         schema.validate(config)
     except SchemaError as e:
-        logger.error(f"配置文件错误, 请检查配置文件:\n{e}.")
-        return False
-    return True
+        return e
+    else:
+        return None
 
 
 def write_faked_config(path):
@@ -162,18 +162,35 @@ def write_faked_config(path):
     with open(path, "w+") as f:
         dump(doc, f)
 
-def prepare_config(config=None):
-    default_config = "config.toml"
-    if not config:
-        if not Path(default_config).exists():
-            return write_faked_config(default_config)
-    with open(config, "rb") as f:
-        config = tomllib.load(f)
-    if not config:
-        return write_faked_config(default_config)
-    if not check_config(config):
-        return
-    proxy = config.get("proxy", None)
+def prepare_config(config_file=None):
+    default_config_file = Path("config.toml")
+    if not config_file:
+        if not default_config_file.exists():
+            write_faked_config(default_config_file)
+            sys.exit(250)
+        else:
+            config_file = default_config_file
+    try:
+        if not Path(config_file).exists():
+            logger.error(f'配置文件 "{config_file}" 不存在.')
+            sys.exit(251)
+        elif config_file == default_config_file:
+            with open(config_file, "rb") as f:
+                config = tomllib.load(f)
+            if not config:
+                write_faked_config(config_file)
+                sys.exit(250)
+        else:
+            with open(config_file, "rb") as f:
+                config = tomllib.load(f)
+    except tomllib.TOMLDecodeError as e:
+        logger.error(f"TOML 配置文件错误: {e}.")
+        sys.exit(252)
+    error = check_config(config)
+    if error:
+        logger.error(f"配置文件错误, 请检查配置文件:\n{error}.")
+        sys.exit(253)
+    proxy: dict = config.get("proxy", None)
     if proxy:
         proxy.setdefault("scheme", "socks5")
         proxy.setdefault("hostname", "127.0.0.1")

@@ -66,9 +66,9 @@ class Client(_Client):
                 while True:
                     if not self.password:
                         if retry:
-                            msg = f'需要输入 "{self.phone_number}" 的两步验证密码 (不显示, 按回车确认): '
-                        else:
                             msg = f'密码错误, 请重新输入 "{self.phone_number}" 的两步验证密码 (不显示, 按回车确认):'
+                        else:
+                            msg = f'需要输入 "{self.phone_number}" 的两步验证密码 (不显示, 按回车确认): '
                         self.password = Prompt.ask(" " * 29 + msg, password=True)
                     try:
                         return await self.check_password(self.password)
