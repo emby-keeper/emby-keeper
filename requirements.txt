@@ -17,3 +17,4 @@ pillow
 thefuzz[speedup]
 schema
 aiocache
+fake_useragent
