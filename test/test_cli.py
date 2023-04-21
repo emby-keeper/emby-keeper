@@ -30,6 +30,7 @@ def test_version():
 
 def test_create_config(in_temp_dir: Path):
     result = runner.invoke(app)
+    print(result.stderr)
     assert '生成' in result.stderr
     assert result.exit_code == 250
     assert Path("config.toml").exists()
@@ -39,9 +40,9 @@ def test_create_config(in_temp_dir: Path):
 
 def test_create_config_empty(in_temp_dir: Path):
     config_file = Path("config.toml")
-    
     config_file.touch()
     result = runner.invoke(app, [str(config_file)])
+    print(result.stderr)
     assert '生成' in result.stderr
     assert result.exit_code == 250
     with open("config.toml", 'rb') as f:
@@ -51,6 +52,7 @@ def test_create_config_empty(in_temp_dir: Path):
     config_file.unlink()
     config_file.touch()
     result = runner.invoke(app)
+    print(result.stderr)
     assert '生成' in result.stderr
     assert result.exit_code == 250
     with open("config.toml", 'rb') as f:
@@ -66,6 +68,7 @@ def test_create_config_empty(in_temp_dir: Path):
 def test_nonexist_config(in_temp_dir: Path):
     for fn in ('config.toml', 'nonexisting.toml'):
         result = runner.invoke(app, [fn])
+        print(result.stderr)
         assert '不存在' in result.stderr
         assert result.exit_code == 251
 
@@ -73,6 +76,7 @@ def test_check_config(in_temp_dir: Path):
     with open('config.toml', 'w+') as f:
         f.write('notifier: true')
     result = runner.invoke(app)
+    print(result.stderr)
     assert '配置文件错误' in result.stderr
     assert result.exit_code == 252
     
@@ -80,5 +84,6 @@ def test_check_config(in_temp_dir: Path):
     with open('config.toml', 'w+') as f:
         tomlkit.dump(config, f)
     result = runner.invoke(app)
+    print(result.stderr)
     assert '配置文件错误' in result.stderr
     assert result.exit_code == 253
