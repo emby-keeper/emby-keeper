@@ -1,0 +1,83 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "embykeeper"
+version = "2.0.9"
+authors = [
+    {name = "jackzzs", email = "jackzzs@outlook.com"},
+]
+description = "Daily checkin automator for emby bots in telegram."
+keywords = [
+    "emby",
+    "telegram",
+    "checkin",
+    "automator",
+    "bot",
+    "telegram bot",
+    "keep active",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Natural Language :: Chinese (Simplified)",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+]
+requires-python = ">=3.7,<3.11"
+dependencies = [
+    "tomli",
+    "tomlkit",
+    "rich",
+    "typer",
+    "schedule",
+    "appdirs",
+    "loguru",
+    "faker",
+    "aiohttp",
+    "aiohttp_socks",
+    "python-dateutil",
+    "ddddocr",
+    "embypy",
+    "pyrogram",
+    "tgcrypto",
+    "pillow",
+    "thefuzz[speedup]",
+    "schema",
+    "aiocache",
+    "fake_useragent",
+]
+
+[project.urls]
+Homepage = "https://github.com/embykeeper/embykeeper"
+
+[project.readme]
+file = "README.md"
+content-type = "text/markdown"
+
+[project.scripts]
+embykeeper = "embykeeper.cli:app"
+
+[tool.setuptools]
+zip-safe = false
+
+[tool.bumpversion]
+current_version = "2.0.9"
+commit = "True"
+tag = "True"
+
+[tool.bumpversion.file.setup.py]
+search = 'version="{current_version}"'
+replace = 'version="{new_version}"'
+
+[tool.bumpversion.file."embykeeper/__init__".py]
+search = '__version__ = "{current_version}"'
+replace = '__version__ = "{new_version}"'
+
+[tool.black]
+line-length = 110

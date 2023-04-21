@@ -1,8 +1,12 @@
 # Configs and outputs
 *.toml
+!/pyproject.toml
 *.msgs
+
 /test.py
 /test.ipynb
+
+# Docs
 images
 
 # Git
