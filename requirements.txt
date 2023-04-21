@@ -6,7 +6,6 @@ schedule
 appdirs
 loguru
 faker
-tinydb
 aiohttp
 aiohttp_socks
 python-dateutil
@@ -17,5 +16,4 @@ tgcrypto
 pillow
 thefuzz[speedup]
 schema
-fake-useragent
 aiocache

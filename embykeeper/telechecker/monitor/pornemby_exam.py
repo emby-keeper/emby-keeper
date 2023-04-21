@@ -1,6 +1,3 @@
-import random
-import string
-
 from pyrogram.types import Message, InlineKeyboardMarkup
 
 from ...utils import truncate_str
@@ -18,7 +15,7 @@ class PornembyExamMonitor(Monitor):
         if "答案" in message.text or not isinstance(message.reply_markup, InlineKeyboardMarkup):
             return
         question = truncate_str(keys[0], 20)
-        result = await Link(self.client).captcha(keys[0] + "\n" + keys[1])
+        result = await Link(self.client).answer(keys[0] + "\n" + keys[1])
         if result:
             self.log.info(f'检测到新问题: "{question}", 回答: {result}.')
         else:

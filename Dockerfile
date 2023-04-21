@@ -1,14 +1,20 @@
-FROM python:3.10-slim-buster
-
-WORKDIR /app
+FROM python:3.8-slim AS builder
 
 VOLUME ["/root/.local/share/embykeeper"]
 
-COPY . .
-RUN touch config.toml
-RUN pip install -i https://pypi.tuna.tsinghua.edu.cn/simple/ -U pip
-RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple/
-RUN pip install .
+RUN mkdir /src
+COPY . /src
+RUN python -m venv /opt/venv
+RUN . /opt/venv/bin/activate \
+    && pip install --no-cache-dir -U pip setuptools wheel \
+    && cd /src \
+    && touch config.toml \
+    && pip install --no-cache-dir .
+
+FROM python:3.8-slim
+
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
 ENTRYPOINT ["embykeeper"]
 CMD ["config.toml"]

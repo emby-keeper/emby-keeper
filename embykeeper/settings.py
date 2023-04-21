@@ -88,6 +88,9 @@ def write_faked_config(path):
     doc.add(comment("Please fill in your account information."))
     doc.add(comment("See details: https://github.com/embykeeper/embykeeper#安装与使用"))
     doc.add(nl())
+    doc.add(comment("将关键信息发送到第一个 Telegram 账号, 设为N以发送到第 N 个."))
+    doc["notifier"] = True
+    doc.add(nl())
     doc.add(comment("每个 Telegram Bot 签到的最大尝试时间."))
     doc["timeout"] = 120
     doc.add(nl())

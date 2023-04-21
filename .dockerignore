@@ -5,13 +5,11 @@
 /test.ipynb
 images
 
-# Vscode
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-!.vscode/*.code-snippets
+# Git
+.git
+.gitignore
+.editorconfig
+.vscode
 
 # Local History for Visual Studio Code
 .history/
