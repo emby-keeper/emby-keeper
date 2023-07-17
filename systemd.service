@@ -1,0 +1,14 @@
+[Unit]
+Description=Emby Keeper Server
+After=network.target
+
+[Service]
+Type=simple
+RestartSec=5s
+Restart=on-failure
+Environment="PY_ENV=venv"
+WorkingDirectory=/opt/workspace/embykeeper
+ExecStart=/bin/bash -c "${PY_ENV}/bin/python -m embykeeper"
+
+[Install]
+WantedBy=multi-user.target

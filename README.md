@@ -259,6 +259,17 @@ git pull
 
 然后重新运行应用.
 
+如有 Systemd 方式部署需求, 可复制 `systemd.service` 模板编辑后按需部署.
+
+```bash
+cp systemd.service embykeeper.service
+vim embykeeper.service #修改 Environment="PY_ENV=venv" 为实际虚拟环境名称，修改 WorkingDirectory=/opt/workspace/embykeeper 为实际目录
+cp embykeeper.service /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable embykeeper.service
+systemctl restart embykeeper.service
+```
+
 ## 命令行帮助
 
 您可以通过运行 `embykeeper -h` 以获取帮助:
