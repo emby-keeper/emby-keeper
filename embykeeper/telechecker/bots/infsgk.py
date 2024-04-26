@@ -1,5 +1,7 @@
 from .base import BotCheckin
 
+__ignore__ = True
+
 
 class InfSGKCheckin(BotCheckin):
     name = "情报局社工库"

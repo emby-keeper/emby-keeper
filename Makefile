@@ -139,7 +139,7 @@ systemd/uninstall:
 
 lint:
 >   "$(VENV)/bin/python" -m black .
->   "$(VENV)/bin/python" -m pre-commit run -a
+>   "$(VENV)/bin/python" -m pre_commit run -a
 
 test:
 >   "$(VENV)/bin/python" -m pytest
