@@ -53,7 +53,7 @@ Embykeeper 将自动向 "[Embykeeper Auth Bot](https://t.me/embykeeper_auth_bot)
   - 其他非 Emby 相关 (默认禁用, 请参考[Wiki](https://github.com/embykeeper/embykeeper/wiki/%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6#service-%E5%AD%90%E9%A1%B9)启用):
     - 搜书神器 (`sssq`) ([@chneez](https://github.com/embykeeper/embykeeper/pull/8) 增加): [机器人](https://t.me/sosdbot)
     - 纸片 DDoS (`zhipian`): [频道](https://t.me/PaperBotnet) [机器人](https://t.me/zhipianbot)
-    - 情报局社工库 (`infsgk`) ([@GrandDuke1106](https://github.com/GrandDuke1106) 增加): [频道1](https://t.me/CIA_cd) [频道2](https://t.me/wanghong_sgk) [群组](https://t.me/heikeciadgk) [机器人](https://t.me/InfSGK_bot)
+    - 情报局社工库 (`infsgk`) ([@GrandDuke1106](https://github.com/GrandDuke1106) 增加): [频道1](https://t.me/CIA_cd) [频道2](https://t.me/wanghong_sgk) [群组](https://t.me/heikeciadgk) [机器人](https://t.me/infSGK0_bot)
     - AI 社工库 (`aisgk`): [频道](https://t.me/AISGKChannel) [机器人](https://t.me/aishegongkubot)
     - 狗狗社工库 (`dogsgk`): [频道](https://t.me/DogeSGK) [机器人](https://t.me/DogeSGK_bot)
     - Data 007 社工库 (`data007sgk`): [频道](https://t.me/DATA007_dev) [机器人](https://t.me/DATA_007bot)
