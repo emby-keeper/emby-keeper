@@ -124,6 +124,7 @@ docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper -
   - AuroraMedia (`aurora`): [频道](https://t.me/AuroraMedia2) [机器人](https://t.me/AuroraMedia1_bot)
   - 起点站 (`tdck`): [群组](https://t.me/tdckemby) [机器人](https://t.me/tdck_emby_create_bot)
   - SaturDay.Lite (`saturday`): [频道](https://t.me/saturday_lite_channel) [群组](https://t.me/SaturDay_Lite) [机器人](https://t.me/saturday_lite_bot)
+  - 月饼 (`moonkk`): [频道](https://t.me/Mooncake_notify) [群组](https://t.me/Mooncake_Emby) [机器人](https://t.me/Moonkkbot)
 
   <!-- #endregion checkiner-sites -->
 
