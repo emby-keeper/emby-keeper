@@ -107,6 +107,7 @@ docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper -
   - 非越助手 (`sfcju`): [频道](https://t.me/sfcj_org) [群组](https://t.me/sfcj_chat) [机器人](https://t.me/sfcju_Bot)
   - Yomo (`yomo`): [频道](https://t.me/yomoemby_notice) [群组](https://t.me/yomoemby) [机器人](https://t.me/yomoemby_bot)
   - Raismusic (`raismusic`): [频道](https://t.me/raisemby_channel) [群组1](https://t.me/raismusic_group) [群组2](https://t.me/Raisembyg) [机器人](https://t.me/raismusicbot)
+  - 鹅 (`zm`): [机器人](https://t.me/ZXCHSJSHbot)
   - AIVBI (`aivbi`): [频道](https://t.me/plus_emby) [群组](https://t.me/plusemby) [机器人](https://t.me/AIVBIbot)
   - Alpha 海外服 (`alpha`): [频道](https://t.me/AlphaTVOverseaChannel) [群组](https://t.me/AlphaTVOverseaGroup) [机器人](https://t.me/AlphaTVOverseaBoss_bot)
   - 月饼 (`mooncake`): [频道](https://t.me/Mooncake_notify) [群组](https://t.me/Mooncake_Emby) [机器人](https://t.me/Moonkkbot)
