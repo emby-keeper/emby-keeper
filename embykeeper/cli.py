@@ -3,10 +3,12 @@ from datetime import datetime, timedelta
 import re
 import sys
 from typing import List
+import json
 
 import typer
 import asyncio
 from dateutil import parser
+from loguru import logger
 
 from . import var, __author__, __name__, __url__, __version__
 from .utils import Flagged, FlagValueCommand, AsyncTyper, AsyncTaskPool, show_exception
@@ -19,6 +21,8 @@ app = AsyncTyper(
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 
+# 在函数外创建绑定的 logger
+logger = logger.bind(scheme="embywatcher")
 
 def version(flag):
     if flag:
@@ -37,6 +41,30 @@ def print_example_config(flag):
         file.seek(0)
         print(file.read())
         raise typer.Exit()
+
+
+async def should_run_emby(config: dict) -> bool:
+    """检查是否应该执行 Emby 保活"""
+    timestamp_file = Path(config["basedir"]) / "watcher_schedule_next_timestamp"
+    
+    if timestamp_file.exists():
+        try:
+            stored_data = json.loads(timestamp_file.read_text())
+            next_time = datetime.fromtimestamp(stored_data["timestamp"])
+            
+            if next_time > datetime.now():
+                logger.info(f"Emby保活: 当前时间早于计划的保活时间 ({next_time.strftime('%m-%d %H:%M %p')}), 跳过本次保活.")
+                return False
+            
+            logger.info(f"Emby保活: 已到达计划的保活时间 ({next_time.strftime('%m-%d %H:%M %p')}), 开始执行保活.")
+            return True
+            
+        except (json.JSONDecodeError, KeyError, OSError) as e:
+            logger.debug(f"读取保活时间缓存失败: {e}")
+            return True  # 如果读取失败，默认执行保活
+    
+    logger.info("Emby保活: 未找到时间缓存文件，执行首次保活.")
+    return True  # 如果没有缓存文件，默认执行保活
 
 
 @app.async_command(
@@ -320,10 +348,17 @@ async def main(
 
     pool = AsyncTaskPool()
 
+    # 检查是否应该执行保活
+    should_run = await should_run_emby(config)
+
+    # 情况1：立即执行模式
     if instant and not debug_cron:
         if emby:
-            pool.add(watcher(config, instant=True))
-            pool.add(watcher_continuous(config))
+            if should_run:
+                pool.add(watcher(config, instant=True))
+                pool.add(watcher_continuous(config))
+            else:
+                logger.info("跳过本次 Emby 保活.")
         if checkin:
             pool.add(checkiner(config, instant=True))
         if subsonic:
@@ -331,27 +366,27 @@ async def main(
         await pool.wait()
         logger.debug("启动时立刻执行签到和保活: 已完成.")
 
+    # 情况2：定时任务模式
     if not once:
-        streams = await start_notifier(config)
-        try:
-            if emby:
-                try:
-                    if debug_cron:
-                        start_time = end_time = (datetime.now() + timedelta(seconds=10)).time()
-                    else:
-                        watchtime = config.get("watchtime", "<11:00AM,11:00PM>")
-                        watchtime_match = re.match(r"<\s*(.*),\s*(.*)\s*>", watchtime)
-                        if watchtime_match:
-                            start_time, end_time = [
-                                parser.parse(watchtime_match.group(i)).time() for i in (1, 2)
-                            ]
-                        else:
-                            start_time = end_time = parser.parse(watchtime).time()
-                except parser.ParserError:
-                    logger.error(
-                        "您设定的 watchtime 不正确, 请检查格式. (例如 11:00, <11:00,14:00> / <11:00AM,2:00PM>). 模拟观看保活将不会运行."
-                    )
+        if emby:
+            try:
+                if debug_cron:
+                    start_time = end_time = (datetime.now() + timedelta(seconds=10)).time()
                 else:
+                    watchtime = config.get("watchtime", "<11:00AM,11:00PM>")
+                    watchtime_match = re.match(r"<\s*(.*),\s*(.*)\s*>", watchtime)
+                    if watchtime_match:
+                        start_time, end_time = [
+                            parser.parse(watchtime_match.group(i)).time() for i in (1, 2)
+                        ]
+                    else:
+                        start_time = end_time = parser.parse(watchtime).time()
+            except parser.ParserError:
+                logger.error(
+                    "您设定的 watchtime 不正确, 请检查格式. (例如 11:00, <11:00,14:00> / <11:00AM,2:00PM>). 模拟观看保活将不会运行."
+                )
+            else:
+                if should_run:  # 使用之前的检查结果
                     pool.add(
                         watcher_schedule(
                             config,
@@ -360,95 +395,83 @@ async def main(
                             end_time=end_time,
                         )
                     )
-                    for a in config.get("emby", ()):
-                        if a.get("continuous", False):
-                            pool.add(
-                                watcher_continuous_schedule(
-                                    config,
-                                    days=0 if debug_cron else 1,
-                                    start_time=start_time,
-                                    end_time=end_time,
-                                )
-                            )
-                            break
-            if subsonic:
-                try:
-                    if debug_cron:
-                        start_time = end_time = (datetime.now() + timedelta(seconds=10)).time()
-                    else:
-                        listentime = config.get("listentime", "<11:00AM,11:00PM>")
-                        listentime_match = re.match(r"<\s*(.*),\s*(.*)\s*>", listentime)
-                        if listentime:
-                            start_time, end_time = [
-                                parser.parse(listentime_match.group(i)).time() for i in (1, 2)
-                            ]
-                        else:
-                            start_time = end_time = parser.parse(listentime).time()
-                except parser.ParserError:
-                    logger.error(
-                        "您设定的 listentime 不正确, 请检查格式. (例如 11:00, <11:00,14:00> / <11:00AM,2:00PM>). 模拟观看保活将不会运行."
-                    )
                 else:
-                    pool.add(
-                        listener_schedule(
-                            config,
-                            days=0 if debug_cron else subsonic,
-                            start_time=start_time,
-                            end_time=end_time,
-                        )
-                    )
-            if checkin:
-                try:
-                    if debug_cron:
-                        start_time = end_time = (datetime.now() + timedelta(seconds=10)).time()
-                    else:
-                        checkin_range_match = re.match(r"<\s*(.*),\s*(.*)\s*>", checkin)
-                        if checkin_range_match:
-                            start_time, end_time = [
-                                parser.parse(checkin_range_match.group(i)).time() for i in (1, 2)
-                            ]
-                        else:
-                            start_time = end_time = parser.parse(checkin).time()
-                except parser.ParserError:
-                    logger.error(
-                        "您设定的 time 不正确, 请检查格式. (例如 11:00, <11:00,14:00> / <11:00AM,2:00PM>). 自动签到将不会运行."
-                    )
+                    logger.info("跳过本次 Emby 保活计划任务设置.")
+        if subsonic:
+            try:
+                if debug_cron:
+                    start_time = end_time = (datetime.now() + timedelta(seconds=10)).time()
                 else:
-                    pool.add(
-                        checkiner_schedule(
-                            config,
-                            instant=False,
-                            start_time=start_time,
-                            end_time=end_time,
-                            days=0 if debug_cron else 1,
-                        )
+                    listentime = config.get("listentime", "<11:00AM,11:00PM>")
+                    listentime_match = re.match(r"<\s*(.*),\s*(.*)\s*>", listentime)
+                    if listentime:
+                        start_time, end_time = [
+                            parser.parse(listentime_match.group(i)).time() for i in (1, 2)
+                        ]
+                    else:
+                        start_time = end_time = parser.parse(listentime).time()
+            except parser.ParserError:
+                logger.error(
+                    "您设定的 listentime 不正确, 请检查格式. (例如 11:00, <11:00,14:00> / <11:00AM,2:00PM>). 模拟观看保活将不会运行."
+                )
+            else:
+                pool.add(
+                    listener_schedule(
+                        config,
+                        days=0 if debug_cron else subsonic,
+                        start_time=start_time,
+                        end_time=end_time,
                     )
-            if monitor:
-                pool.add(monitorer(config))
-            if send:
-                pool.add(messager(config))
+                )
+        if checkin:
+            try:
+                if debug_cron:
+                    start_time = end_time = (datetime.now() + timedelta(seconds=10)).time()
+                else:
+                    checkin_range_match = re.match(r"<\s*(.*),\s*(.*)\s*>", checkin)
+                    if checkin_range_match:
+                        start_time, end_time = [
+                            parser.parse(checkin_range_match.group(i)).time() for i in (1, 2)
+                        ]
+                    else:
+                        start_time = end_time = parser.parse(checkin).time()
+            except parser.ParserError:
+                logger.error(
+                    "您设定的 time 不正确, 请检查格式. (例如 11:00, <11:00,14:00> / <11:00AM,2:00PM>). 自动签到将不会运行."
+                )
+            else:
+                pool.add(
+                    checkiner_schedule(
+                        config,
+                        instant=False,
+                        start_time=start_time,
+                        end_time=end_time,
+                        days=0 if debug_cron else 1,
+                    )
+                )
+        if monitor:
+            pool.add(monitorer(config))
+        if send:
+            pool.add(messager(config))
 
-            async for t in pool.as_completed():
-                msg = f"任务 {t.get_name()} "
-                try:
-                    e = t.exception()
-                    if e:
-                        msg += f"发生错误并退出: {e}"
-                    else:
-                        msg += f"成功结束."
-                except asyncio.CancelledError:
-                    msg += f"被取消."
-                logger.debug(msg)
-                try:
-                    await t
-                except Exception as e:
-                    logger.error("出现错误, 模块可能停止运行.")
-                    show_exception(e, regular=False)
-                    if not config.get("nofail", True):
-                        raise
-        except asyncio.CancelledError:
-            if streams:
-                await asyncio.gather(*[stream.join() for stream in streams])
+        async for t in pool.as_completed():
+            msg = f"任务 {t.get_name()} "
+            try:
+                e = t.exception()
+                if e:
+                    msg += f"发生错误并退出: {e}"
+                else:
+                    msg += f"成功结束."
+            except asyncio.CancelledError:
+                msg += f"被取消."
+            logger.debug(msg)
+            try:
+                await t
+            except Exception as e:
+                logger.error("出现错误, 模块可能停止运行.")
+                show_exception(e, regular=False)
+                if not config.get("nofail", True):
+                    raise
 
 
 if __name__ == "__main__":
