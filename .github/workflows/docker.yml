@@ -11,7 +11,7 @@ on:
     types: [released]
 
 env:
-  REGISTRY_IMAGE: embykeeper/embykeeper
+  REGISTRY_IMAGE: aprpure/embykeeper
 
 permissions:
   contents: read
