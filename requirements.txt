@@ -33,3 +33,4 @@ httpx[http2]
 socksio
 telethon
 psutil
+xpinyin

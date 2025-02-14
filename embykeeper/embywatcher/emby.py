@@ -30,21 +30,14 @@ class Connector(_Connector):
     def __init__(
         self,
         url,
+        headers,
         proxy=None,
-        ua=None,
-        device=None,
-        client=None,
-        client_version=None,
         cf_clearance=None,
         **kw,
     ):
         super().__init__(url, **kw)
+        self.headers = headers
         self.proxy = proxy
-        self.ua = ua
-        self.device = device
-        self.client = client
-        self.client_version = client_version
-        self.fake_headers = self.get_fake_headers()
         self.watch = asyncio.create_task(self.watchdog())
         self.cf_clearance = cf_clearance
 
@@ -80,35 +73,6 @@ class Connector(_Connector):
                     except asyncio.TimeoutError:
                         pass
 
-    @staticmethod
-    def get_device_uuid():
-        rd = random.Random()
-        rd.seed(uuid.getnode())
-        return uuid.UUID(int=rd.getrandbits(128))
-
-    def get_fake_headers(self):
-        headers = {}
-        client = "Fileball" if not self.client else self.client
-        device = "iPhone" if not self.device else self.device
-        device_id = str(self.get_device_uuid()).upper() if not self.device_id else self.device_id
-        version = f"1.3.{random.randint(28, 30)}" if not self.client_version else self.client_version
-        ua = f"Fileball/{version}" if not self.ua else self.ua
-        auth_headers = {
-            "Client": client,
-            "Device": device,
-            "DeviceId": device_id,
-            "Version": version,
-        }
-        auth_header = f"Emby {','.join([f'{k}={v}' for k, v in auth_headers.items()])}"
-        if self.token:
-            headers["X-Emby-Token"] = self.token
-        headers["User-Agent"] = ua
-        headers["X-Emby-Authorization"] = auth_header
-        headers["Accept-Language"] = "zh-CN,zh-Hans;q=0.9"
-        headers["Content-Type"] = "application/json"
-        headers["Accept"] = "*/*"
-        return headers
-
     async def _get_session(self):
         try:
             loop = asyncio.get_running_loop()
@@ -127,7 +91,7 @@ class Connector(_Connector):
 
                     session = httpx.AsyncClient(
                         http2=True,
-                        headers=self.fake_headers,
+                        headers=self.headers,
                         cookies=cookies,
                         proxy=proxy,
                         verify=False,

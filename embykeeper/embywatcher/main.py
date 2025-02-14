@@ -7,12 +7,16 @@ import re
 import string
 from typing import TYPE_CHECKING, Iterable, Tuple, Union
 from datetime import datetime, time, timezone
+import uuid
 import warnings
 import json
+import urllib.parse
 
 import httpx
 from loguru import logger
 from dateutil import parser
+from urllib.parse import urlparse
+from faker import Faker
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -26,7 +30,7 @@ if TYPE_CHECKING:
     from loguru import Logger
 
 logger = logger.bind(scheme="embywatcher")
-
+cache_lock = asyncio.Lock()
 
 class PlayError(Exception):
     pass
@@ -212,6 +216,113 @@ async def get_cf_clearance(config, url, user_agent=None):
             return cf_clearance
     return None
 
+def get_device_uuid():
+    rd = random.Random()
+    rd.seed(uuid.getnode())
+    return uuid.UUID(int=rd.getrandbits(128))
+
+def get_random_device():
+    device_type = random.choice(('iPhone', 'iPad'))
+    
+    # All patterns with their weights
+    patterns = [
+        ('chinese_normal', 20),
+        ('chinese_lastname_pinyin', 40),
+        ('chinese_firstname_pinyin', 10),
+        ('english_normal', 20),
+        ('english_upper', 10),
+        ('english_name_only', 10)
+    ]
+    
+    pattern = random.choices([p[0] for p in patterns], weights=[p[1] for p in patterns])[0]
+    
+    if pattern.startswith('chinese'):
+        fake = Faker('zh_CN')
+        surname = fake.last_name()
+        given_name = fake.first_name_male() if random.random() < 0.5 else fake.first_name_female()
+        
+        if pattern == 'chinese_normal':
+            return f"{surname}{given_name}的{device_type}"
+        else:
+            from xpinyin import Pinyin
+            p = Pinyin()
+            if pattern == 'chinese_lastname_pinyin':
+                pinyin = p.get_pinyin(surname).capitalize()
+                return f"{pinyin}的{device_type}"
+            else:  # chinese_firstname_pinyin
+                pinyin = ''.join([word[0].upper() for word in p.get_pinyin(given_name).split('-')])
+                return f"{pinyin}的{device_type}"
+    else:
+        fake = Faker('en_US')
+        name = fake.first_name()
+        
+        if pattern == 'english_normal':
+            return f"{name}'s {device_type}"
+        elif pattern == 'english_upper':
+            return f"{name.upper()}{device_type.upper()}"
+        else:  # english_name_only
+            return name
+
+async def get_fake_headers(
+    basedir: Path,
+    hostname: str,
+    client: str = None,
+    device: str = None,
+    device_id: str = None,
+    client_version: str = None,
+    ua: str = None,
+):
+    headers = {}
+    cache_dir = basedir / "emby_headers"
+    cache_file = cache_dir / f"{hostname}.json"
+    
+    async with cache_lock:
+        cache_dir.mkdir(exist_ok=True, parents=True)
+        cached_headers = {}
+        if cache_file.exists():
+            try:
+                cached_headers = json.loads(cache_file.read_text())
+            except (json.JSONDecodeError, OSError) as e:
+                logger.debug(f"读取 Emby 请求头缓存失败: {e}")
+    
+    # 按优先级获取各个值
+    client = client or cached_headers.get("client") or "Fileball"
+    device = device or cached_headers.get("device") or get_random_device()
+    device_id = device_id or cached_headers.get("device_id") or str(get_device_uuid()).upper()
+    version = client_version or cached_headers.get("client_version") or f"1.3.{random.randint(28, 30)}"
+    ua = ua or cached_headers.get("ua") or f"Fileball/{version}"
+    
+    # 构建认证头
+    auth_headers = {
+        "Client": client,
+        "Device": device,
+        "DeviceId": device_id,
+        "Version": version,
+    }
+    auth_header = f"Emby {','.join([f'{k}={urllib.parse.quote(str(v))}' for k, v in auth_headers.items()])}"
+    
+    # 构建完整请求头
+    headers["User-Agent"] = ua
+    headers["X-Emby-Authorization"] = auth_header
+    headers["Accept-Language"] = "zh-CN,zh-Hans;q=0.9"
+    headers["Content-Type"] = "application/json"
+    headers["Accept"] = "*/*"
+    
+    # 保存到缓存
+    async with cache_lock:
+        try:
+            cache_data = {
+                "client": client,
+                "device": device,
+                "device_id": device_id,
+                "client_version": version,
+                "ua": ua
+            }
+            cache_file.write_text(json.dumps(cache_data, indent=2))
+        except OSError as e:
+            logger.debug(f"保存 headers 缓存失败: {e}")
+            
+    return headers
 
 async def login(config, continuous=None, per_site=None):
     """登录账号."""
@@ -229,34 +340,41 @@ async def login(config, continuous=None, per_site=None):
             cf_clearance = None
 
             device_id = a.get("device_id", None)
+            basedir = Path(config["basedir"])
             if not device_id:
-                device_id_file = Path(config["basedir"]) / "emby_device_id"
+                device_id_file = basedir / "emby_device_id"
                 if device_id_file.exists():
                     try:
                         device_id = device_id_file.read_text().strip()
                     except OSError as e:
                         logger.debug(f"读取 device_id 文件失败: {e}")
                 if not device_id:
-                    from .emby import Connector
-
-                    device_id = str(Connector.get_device_uuid()).upper()
+                    device_id = str(get_device_uuid()).upper()
                     try:
                         device_id_file.write_text(device_id)
                     except OSError as e:
                         logger.debug(f"保存 device_id 文件失败: {e}")
             if not a["password"]:
                 logger.warning(f'Emby "{a["url"]}" 未设置密码, 可能导致登陆失败.')
+            
+            hostname = urlparse(a["url"]).netloc
+            headers = await get_fake_headers(
+                basedir=basedir,
+                hostname=hostname,
+                ua=a.get("ua", None),
+                device=a.get("device", None),
+                client=a.get("client", None),
+                client_version=a.get("client_version", None),
+                device_id=device_id,
+            )
+            
             emby = Emby(
                 url=a["url"],
                 username=a["username"],
                 password=a["password"],
                 jellyfin=a.get("jellyfin", False),
                 proxy=config.get("proxy", None) if a.get("use_proxy", True) else None,
-                ua=a.get("ua", None),
-                device=a.get("device", None),
-                client=a.get("client", None),
-                client_version=a.get("client_version", None),
-                device_id=device_id,
+                headers=headers,
                 cf_clearance=cf_clearance,
             )
             try:
@@ -302,6 +420,7 @@ async def login(config, continuous=None, per_site=None):
                 a.get("time", None if continuous else [120, 240]),
                 True if continuous else a.get("allow_multiple", True),
                 a.get("allow_stream", False),
+                a.get("hide", False),
             )
         else:
             logger.bind(log=True).error(f'Emby "{a["url"]}" 无法获取元信息而跳过, 请重新检查配置.')
@@ -313,6 +432,7 @@ async def watch(
     loggeruser: Logger,
     time: Union[float, Tuple[float, float]],
     stream: bool = False,
+    hide: bool = False,
     retries: int = 5,
 ):
     """
@@ -392,13 +512,14 @@ async def watch(
                             await asyncio.sleep(rt)
                         break
                     finally:
-                        try:
-                            if not await asyncio.shield(asyncio.wait_for(hide_from_resume(obj), 5)):
-                                loggeruser.debug(f"未能成功从最近播放中隐藏视频.")
-                            else:
-                                loggeruser.info(f"已从最近播放中隐藏该视频.")
-                        except asyncio.TimeoutError:
-                            loggeruser.debug(f"从最近播放中隐藏视频超时.")
+                        if hide:
+                            try:
+                                if not await asyncio.shield(asyncio.wait_for(hide_from_resume(obj), 5)):
+                                    loggeruser.debug(f"未能成功从最近播放中隐藏视频.")
+                                else:
+                                    loggeruser.info(f"已从最近播放中隐藏该视频.")
+                            except asyncio.TimeoutError:
+                                loggeruser.debug(f"从最近播放中隐藏视频超时.")
             else:
                 loggeruser.warning(f"由于没有成功播放视频, 保活失败, 请重新检查配置.")
                 return False
@@ -424,6 +545,7 @@ async def watch_multiple(
     loggeruser: Logger,
     time: Union[float, Tuple[float, float]],
     stream: bool = False,
+    hide: bool = False,
     retries: int = 5,
 ):
     if isinstance(time, Iterable):
@@ -515,13 +637,14 @@ async def watch_multiple(
                             await asyncio.sleep(rt)
                         break
                     finally:
-                        try:
-                            if not await asyncio.shield(asyncio.wait_for(hide_from_resume(obj), 5)):
-                                loggeruser.debug(f"未能成功从最近播放中隐藏视频.")
-                            else:
-                                loggeruser.info(f"已从最近播放中隐藏该视频.")
-                        except asyncio.TimeoutError:
-                            loggeruser.debug(f"从最近播放中隐藏视频超时.")
+                        if hide:
+                            try:
+                                if not await asyncio.shield(asyncio.wait_for(hide_from_resume(obj), 5)):
+                                    loggeruser.debug(f"未能成功从最近播放中隐藏视频.")
+                                else:
+                                    loggeruser.info(f"已从最近播放中隐藏该视频.")
+                            except asyncio.TimeoutError:
+                                loggeruser.debug(f"从最近播放中隐藏视频超时.")
             else:
                 loggeruser.warning(f"由于没有成功播放视频, 保活失败, 请重新检查配置.")
                 return False
@@ -542,13 +665,15 @@ async def watch_multiple(
             return False
 
 
-async def watch_continuous(emby: Emby, loggeruser: Logger, stream: bool = False):
+async def watch_continuous(emby: Emby, loggeruser: Logger, stream: bool = False, hide: bool = False):
     """
     主执行函数 - 持续观看.
 
     参数:
         emby: Emby 客户端
         loggeruser: 日志器
+        stream: 是否允许流媒体
+        hide: 是否从继续收看中隐藏
     """
     while True:
         try:
@@ -571,11 +696,14 @@ async def watch_continuous(emby: Emby, loggeruser: Logger, stream: bool = False)
                     await asyncio.sleep(rt)
                     continue
                 finally:
-                    try:
-                        if not await asyncio.shield(asyncio.wait_for(hide_from_resume(obj), 2)):
-                            loggeruser.debug(f"未能成功从最近播放中隐藏视频.")
-                    except asyncio.TimeoutError:
-                        loggeruser.debug(f"从最近播放中隐藏视频超时.")
+                    if hide:
+                        try:
+                            if not await asyncio.shield(asyncio.wait_for(hide_from_resume(obj), 2)):
+                                loggeruser.debug(f"未能成功从最近播放中隐藏视频.")
+                            else:
+                                loggeruser.info(f"已从最近播放中隐藏该视频.")
+                        except asyncio.TimeoutError:
+                            loggeruser.debug(f"从最近播放中隐藏视频超时.")
         except httpx.HTTPError as e:
             rt = random.uniform(30, 60)
             loggeruser.info(f"连接失败, 等待 {rt:.0f} 秒后重试: {e}.")
@@ -598,6 +726,7 @@ async def watcher(config: dict, instant: bool = False, per_site: bool = None):
         time: float,
         multiple: bool,
         stream: bool,
+        hide: bool,
     ):
         async with sem:
             try:
@@ -611,10 +740,10 @@ async def watcher(config: dict, instant: bool = False, per_site: bool = None):
                     tm = time * 4
                 if multiple:
                     return await asyncio.wait_for(
-                        watch_multiple(emby, loggeruser, time, stream), max(tm, 600)
+                        watch_multiple(emby, loggeruser, time, stream, hide), max(tm, 600)
                     )
                 else:
-                    return await asyncio.wait_for(watch(emby, loggeruser, time, stream), max(tm, 600))
+                    return await asyncio.wait_for(watch(emby, loggeruser, time, stream, hide), max(tm, 600))
             except asyncio.TimeoutError:
                 loggeruser.warning(f"一定时间内未完成播放, 保活失败.")
                 return False
@@ -626,8 +755,10 @@ async def watcher(config: dict, instant: bool = False, per_site: bool = None):
     if not concurrent:
         concurrent = 100000
     sem = asyncio.Semaphore(concurrent)
-    async for emby, loggeruser, time, multiple, stream in login(config, per_site=per_site, continuous=False):
-        tasks.append(wrapper(sem, emby, loggeruser, time, multiple, stream))
+    async for emby, loggeruser, time, multiple, stream, hide in login(
+        config, per_site=per_site, continuous=False
+    ):
+        tasks.append(wrapper(sem, emby, loggeruser, time, multiple, stream, hide))
     if not per_site:
         if not tasks:
             logger.info("没有指定相关的 Emby 服务器, 跳过保活.")
@@ -812,7 +943,7 @@ async def watcher_schedule_site(config: dict, instant: bool = False):
 async def watcher_continuous(config: dict):
     """入口函数 - 持续观看."""
 
-    async def wrapper(emby: Emby, loggeruser: Logger, time: float, stream: bool):
+    async def wrapper(emby: Emby, loggeruser: Logger, time: float, stream: bool, hide: bool):
         if time:
             if isinstance(time, Iterable):
                 time = random.uniform(*time)
@@ -820,7 +951,7 @@ async def watcher_continuous(config: dict):
         else:
             loggeruser.info(f"即将无限连续播放视频.")
         try:
-            await asyncio.wait_for(watch_continuous(emby, loggeruser, stream), time)
+            await asyncio.wait_for(watch_continuous(emby, loggeruser, stream, hide), time)
         except asyncio.TimeoutError:
             loggeruser.info(f"连续播放结束, 将在明天继续连续播放.")
             return True
@@ -829,8 +960,8 @@ async def watcher_continuous(config: dict):
 
     logger.info("开始执行 Emby 持续观看.")
     tasks = []
-    async for emby, loggeruser, time, _, stream in login(config, continuous=True, per_site=False):
-        tasks.append(wrapper(emby, loggeruser, time, stream))
+    async for emby, loggeruser, time, _, stream, hide in login(config, continuous=True, per_site=False):
+        tasks.append(wrapper(emby, loggeruser, time, stream, hide))
     if not tasks:
         logger.info("没有指定相关的 Emby 服务器, 跳过持续观看.")
     return await asyncio.gather(*tasks)
@@ -929,11 +1060,11 @@ async def play_url(config: dict, url: str):
     filtered_config = config.copy()
     filtered_config["emby"] = [matched_config]
 
-    async for emby, loggeruser, _, _, _ in login(filtered_config):
+    async for emby, loggeruser, _, _, _, _ in login(filtered_config):
         logger.info(f'已登陆到 Emby: {matched_config["url"]}')
         connector: Connector = emby.connector
         logger.info("使用以下 Headers:")
-        for k, v in connector.get_fake_headers().items():
+        for k, v in connector.headers.items():
             logger.info(f"\t{k}: {v}")
         item = await emby.get_item(video_id)
         if not item:

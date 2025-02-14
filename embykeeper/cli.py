@@ -141,7 +141,7 @@ async def main(
     ),
     dump: List[str] = typer.Option([], "--dump", "-D", rich_help_panel="调试工具", help="仅启动更新日志"),
     top: bool = typer.Option(
-        True, "--no-top", "-T", rich_help_panel="调试参数", help="执行过程中显示系统调试状态"
+        False, "--top", "-T", rich_help_panel="调试参数", help="执行过程中显示系统状态底栏"
     ),
     play: str = typer.Option(None, "--play-url", "-p", rich_help_panel="调试工具", help="仅模拟观看一个视频"),
     save: bool = typer.Option(

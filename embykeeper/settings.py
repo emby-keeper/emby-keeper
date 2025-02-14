@@ -103,6 +103,7 @@ def check_config(config):
                         Optional("use_proxy"): bool,
                         Optional("interval"): Or(PositiveInt(), str),
                         Optional("watchtime"): str,
+                        Optional("hide"): bool,
                     }
                 )
             ],
