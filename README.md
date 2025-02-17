@@ -125,6 +125,8 @@ docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper -
     - 新机器人 (`tdck_new`): [机器人](https://t.me/StartTdckBot)
     - 旧机器人 (`tdck`) [机器人](https://t.me/tdck_emby_create_bot)
   - 惊蛰 (`jingzhe`): [频道](https://t.me/jz_emby) [群组](https://t.me/jingzhe_EMBY) [机器人](https://t.me/JingzheProbot)
+  - 墨云阁 (`moyunge`): [机器人](https://t.me/MoYunGeBoss_bot)
+  - Kiku (`kiku`): [机器人](https://t.me/kikuemby_bot)
 
   <!-- #endregion checkiner-sites -->
 
