@@ -4,11 +4,11 @@ from typing import Callable, Coroutine, List, Optional, Tuple, Union
 import uuid
 from io import BytesIO
 
-import yaml
 import tomli
 from loguru import logger
 from pyrogram import filters
 from pyrogram.handlers import MessageHandler
+from pyrogram.enums import ParseMode
 from pyrogram.types import Message
 from pyrogram.errors.exceptions.bad_request_400 import YouBlockedUser
 from pyrogram.errors import FloodWait
@@ -95,11 +95,21 @@ class Link:
                 try:
                     messages = []
                     if photo:
-                        messages.append(await self.client.send_photo(self.bot, photo, caption=cmd))
+                        messages.append(
+                            await self.client.send_photo(
+                                self.bot, photo, caption=cmd, parse_mode=ParseMode.DISABLED
+                            )
+                        )
                     elif file:
-                        messages.append(await self.client.send_document(self.bot, file, caption=cmd))
+                        messages.append(
+                            await self.client.send_document(
+                                self.bot, file, caption=cmd, parse_mode=ParseMode.DISABLED
+                            )
+                        )
                     else:
-                        messages.append(await self.client.send_message(self.bot, cmd))
+                        messages.append(
+                            await self.client.send_message(self.bot, cmd, parse_mode=ParseMode.DISABLED)
+                        )
                     self.log.debug(f"[gray50]-> {cmd}[/]")
                     results = await asyncio.wait_for(future, timeout=timeout)
                 except asyncio.CancelledError:
@@ -294,7 +304,7 @@ class Link:
 
     async def gpt(self, prompt: str):
         """向机器人发送智能回答请求."""
-        results = await self.post(f"/gpt {self.instance} {prompt}", timeout=20, name="请求智能回答")
+        results = await self.post(f"/gpt {self.instance} {prompt}", timeout=40, name="请求智能回答")
         if results:
             return results.get("answer", None), results.get("by", None)
         else:

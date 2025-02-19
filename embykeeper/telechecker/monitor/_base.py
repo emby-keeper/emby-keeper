@@ -108,6 +108,7 @@ class Monitor:
     chat_allow_outgoing: bool = False  # 是否支持自己发言触发
     chat_user: Union[str, List[str]] = []  # 仅被列表中用户的发言触发 (支持 username / userid)
     chat_keyword: Union[str, List[str]] = []  # 仅当消息含有列表中的关键词时触发, 支持 regex
+    chat_except_keyword: Union[str, List[str]] = []  # 消息含有列表中的关键词时不触发, 支持 regex
     chat_probability: float = 1.0  # 发信概率 (0最低, 1最高)
     chat_delay: int = 0  # 发信延迟 (s)
     chat_follow_user: int = 0  # 需要等待 N 个用户发送 {chat_reply} 方可回复
@@ -257,8 +258,12 @@ class Monitor:
             and cls.chat_user
             and not any(i in to_iterable(cls.chat_user) for i in (sender.id, sender.username))
         ):
-            return False
+            return
         text = message.text or message.caption
+        if cls.chat_except_keyword:
+            for k in to_iterable(cls.chat_except_keyword):
+                if re.search(k, text, re.IGNORECASE):
+                    return
         if cls.chat_keyword:
             for k in to_iterable(cls.chat_keyword):
                 if k is None or text is None:

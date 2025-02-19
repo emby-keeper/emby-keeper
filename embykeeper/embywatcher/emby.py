@@ -1,5 +1,6 @@
 import asyncio
 import json
+from pathlib import Path
 import random
 from urllib.parse import urlencode, urlunparse
 import uuid
@@ -26,12 +27,15 @@ class Connector(_Connector):
     """重写的 Emby 连接器, 以支持代理."""
 
     playing_count = 0
+    cache_lock = asyncio.Lock()
 
     def __init__(
         self,
         url,
         headers,
         proxy=None,
+        basedir=None,
+        auth_header=None,
         cf_clearance=None,
         **kw,
     ):
@@ -39,6 +43,8 @@ class Connector(_Connector):
         self.headers = headers
         self.proxy = proxy
         self.watch = asyncio.create_task(self.watchdog())
+        self.basedir: Path = basedir
+        self.auth_header: str = auth_header
         self.cf_clearance = cf_clearance
 
     async def watchdog(self, timeout=60):
@@ -126,6 +132,22 @@ class Connector(_Connector):
 
     @async_func
     async def login_if_needed(self):
+        hostname = self.url.netloc
+        cache_dir = self.basedir / "emby_tokens"
+        cache_file = cache_dir / f"{hostname}_{self.username}.json"
+
+        if not self.token:
+            async with self.cache_lock:
+                cache_dir.mkdir(exist_ok=True, parents=True)
+                if cache_file.exists():
+                    try:
+                        data = json.loads(cache_file.read_text())
+                        self.token = data["token"]
+                        self.userid = data["userid"]
+                        self.api_key = self.token
+                    except (json.JSONDecodeError, OSError, KeyError) as e:
+                        logger.debug(f"读取 Emby Token 缓存失败: {e}")
+
         if not self.token:
             return await self.login()
 
@@ -150,13 +172,20 @@ class Connector(_Connector):
             self.userid = data.get("User", {}).get("Id")
             self.api_key = self.token
 
-            session: httpx.AsyncClient = await self._get_session()
-            auth_header = session.headers["X-Emby-Authorization"]
-            auth_header += f',Token="{self.token}"'
-            session.headers["X-MediaBrowser-Token"] = self.token
-            session.headers["Authorization"] = auth_header
-            session.headers["X-Emby-Authorization"] = auth_header
-            await self._end_session()
+            hostname = self.url.netloc
+            cache_dir = self.basedir / "emby_tokens"
+            cache_file = cache_dir / f"{hostname}_{self.username}.json"
+
+            async with self.cache_lock:
+                try:
+                    cache_data = {
+                        "token": self.token,
+                        "userid": self.userid,
+                    }
+                    cache_file.write_text(json.dumps(cache_data, indent=2))
+                except OSError as e:
+                    logger.debug(f"保存 Emby Token 缓存失败: {e}")
+
         finally:
             self.attempt_login = False
 
@@ -164,6 +193,11 @@ class Connector(_Connector):
     async def _req(self, method, path, params={}, **query):
         query.pop("format", None)
         await self.login_if_needed()
+        session: httpx.AsyncClient = await self._get_session()
+        full_auth_header = f'MediaBrowser Token={self.token or ""},Emby UserId={str(uuid.uuid4()).upper()},{self.auth_header}'
+        session.headers["X-Emby-Authorization"] = full_auth_header
+        if self.token:
+            session.headers["X-Emby-Token"] = self.token
         for i in range(self.tries):
             url = self.get_url(path, **query)
             try:
@@ -241,11 +275,11 @@ class Connector(_Connector):
     async def get_stream_noreturn(self, path, **query):
         try:
             session = await self._get_session()
-            url = self.get_url(path, **query)
+            url = self.get_url(path)
             async with session.stream(
                 "GET",
                 url,
-                params={"timeout": httpx.Timeout(connect=10.0, read=None, write=10.0, pool=10.0)},
+                timeout=httpx.Timeout(connect=10.0, read=None, write=10.0, pool=10.0),
                 **query,
             ) as resp:
                 async for _ in resp.aiter_bytes(chunk_size=4096):

@@ -1,1 +1,1 @@
-embykeeper==6.6.4
+embykeeper==6.7.3

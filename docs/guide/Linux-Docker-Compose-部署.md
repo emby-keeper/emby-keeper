@@ -32,6 +32,7 @@ docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper -
 .
 ├── embykeeper
 │   ├── config.toml
+│   ├── +xxxxx.session
 │   └── +xxxxx.login
 └── docker-compose.yml
 ```

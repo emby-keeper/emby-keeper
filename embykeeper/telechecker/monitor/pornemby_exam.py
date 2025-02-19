@@ -212,7 +212,6 @@ class _PornembyExamAnswerMonitor(Monitor):
         question_photo = await message.download(in_memory=True)
 
         codes = [re.sub(r"-\w$", "", k) for k in key]
-        print(codes)
 
         async def get_cover_with_timeout(code):
             try:

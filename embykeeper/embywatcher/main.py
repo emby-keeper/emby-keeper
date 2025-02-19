@@ -32,6 +32,7 @@ if TYPE_CHECKING:
 logger = logger.bind(scheme="embywatcher")
 cache_lock = asyncio.Lock()
 
+
 class PlayError(Exception):
     pass
 
@@ -51,6 +52,8 @@ async def get_random_media(emby: Emby):
         i: Union[Movie, Episode]
         for i in items:
             yield i
+        if not items:
+            break
 
 
 async def set_played(obj: EmbyObject):
@@ -80,7 +83,113 @@ async def play(obj: EmbyObject, loggeruser: Logger, time: float = 10):
 
     await asyncio.sleep(random.uniform(1, 3))
 
-    # 获取页面信息
+    playback_info_data = {
+        "DeviceProfile": {
+            "CodecProfiles": [
+                {
+                    "ApplyConditions": [
+                        {
+                            "IsRequired": False,
+                            "Value": "true",
+                            "Condition": "NotEquals",
+                            "Property": "IsAnamorphic",
+                        },
+                        {
+                            "IsRequired": False,
+                            "Value": "high|main|baseline|constrained baseline",
+                            "Condition": "EqualsAny",
+                            "Property": "VideoProfile",
+                        },
+                        {
+                            "IsRequired": False,
+                            "Value": "80",
+                            "Condition": "LessThanEqual",
+                            "Property": "VideoLevel",
+                        },
+                        {
+                            "IsRequired": False,
+                            "Value": "true",
+                            "Condition": "NotEquals",
+                            "Property": "IsInterlaced",
+                        },
+                    ],
+                    "Type": "Video",
+                    "Codec": "h264",
+                },
+                {
+                    "ApplyConditions": [
+                        {
+                            "IsRequired": False,
+                            "Value": "true",
+                            "Condition": "NotEquals",
+                            "Property": "IsAnamorphic",
+                        },
+                        {
+                            "IsRequired": False,
+                            "Value": "high|main|main 10",
+                            "Condition": "EqualsAny",
+                            "Property": "VideoProfile",
+                        },
+                        {
+                            "IsRequired": False,
+                            "Value": "175",
+                            "Condition": "LessThanEqual",
+                            "Property": "VideoLevel",
+                        },
+                        {
+                            "IsRequired": False,
+                            "Value": "true",
+                            "Condition": "NotEquals",
+                            "Property": "IsInterlaced",
+                        },
+                    ],
+                    "Type": "Video",
+                    "Codec": "hevc",
+                },
+            ],
+            "SubtitleProfiles": [
+                {"Method": "Embed", "Format": "ass"},
+                {"Method": "Embed", "Format": "ssa"},
+                {"Method": "Embed", "Format": "subrip"},
+                {"Method": "Embed", "Format": "sub"},
+                {"Method": "Embed", "Format": "pgssub"},
+                {"Method": "External", "Format": "subrip"},
+                {"Method": "External", "Format": "sub"},
+                {"Method": "External", "Format": "ass"},
+                {"Method": "External", "Format": "ssa"},
+                {"Method": "External", "Format": "vtt"},
+                {"Method": "External", "Format": "ass"},
+                {"Method": "External", "Format": "ssa"},
+            ],
+            "MaxStreamingBitrate": 40000000,
+            "DirectPlayProfiles": [
+                {
+                    "Container": "mov,mp4,mkv,webm",
+                    "Type": "Video",
+                    "VideoCodec": "h264,hevc,dvhe,dvh1,h264,hevc,hev1,mpeg4,vp9",
+                    "AudioCodec": "aac,mp3,wav,ac3,eac3,flac,truehd,dts,dca,opus",
+                }
+            ],
+            "TranscodingProfiles": [
+                {
+                    "MinSegments": 2,
+                    "AudioCodec": "aac,mp3,wav,ac3,eac3,flac,opus",
+                    "VideoCodec": "hevc,h264,mpeg4",
+                    "BreakOnNonKeyFrames": True,
+                    "Type": "Video",
+                    "Protocol": "hls",
+                    "MaxAudioChannels": "6",
+                    "Container": "ts",
+                    "Context": "Streaming",
+                }
+            ],
+            "ContainerProfiles": [],
+            "MusicStreamingTranscodingBitrate": 40000000,
+            "ResponseProfiles": [{"MimeType": "video\/mp4", "Container": "m4v", "Type": "Video"}],
+            "MaxStaticBitrate": 40000000,
+        }
+    }
+
     resp = await c.getJson(
         f"/Videos/{obj.id}/AdditionalParts",
         Fields="PrimaryImageAspectRatio,UserData,CanDelete",
@@ -89,49 +198,89 @@ async def play(obj: EmbyObject, loggeruser: Logger, time: float = 10):
         SortBy="SortName",
     )
 
-    await asyncio.sleep(random.uniform(1, 3))
-
-    # 获取播放源
     resp = await c.postJson(
         f"/Items/{obj.id}/PlaybackInfo",
-        UserID=c.userid,
+        AutoOpenLiveStream=False,
+        IsPlayback=False,
+        MaxStreamingBitrate=40000000,
         StartTimeTicks=0,
-        IsPlayback=True,
-        AutoOpenLiveStream=True,
-        MaxStreamingBitrate=42000000,
+        UserID=c.userid,
+        data=playback_info_data,
     )
     play_session_id = resp.get("PlaySessionId", "")
     if "MediaSources" in resp:
         media_source_id = resp["MediaSources"][0]["Id"]
-        direct_stream_id = resp["MediaSources"][0].get("DirectStreamUrl", None)
+        direct_stream_url = resp["MediaSources"][0].get("DirectStreamUrl", None)
     else:
         media_source_id = "".join(random.choice(string.ascii_lowercase + string.digits) for _ in range(32))
-        direct_stream_id = None
+        direct_stream_url = None
 
     await asyncio.sleep(random.uniform(1, 3))
 
     # 模拟播放
-    playing_info = lambda tick: {
-        "VolumeLevel": 100,
-        "CanSeek": True,
-        "BufferedRanges": [{"start": 0, "end": tick}] if tick else [],
-        "IsPaused": False,
-        "ItemId": obj.id,
-        "MediaSourceId": media_source_id,
-        "PlayMethod": "DirectStream",
-        "PlaySessionId": play_session_id,
-        "PlaylistIndex": 0,
-        "PlaylistLength": 1,
-        "PositionTicks": tick,
-        "RepeatMode": "RepeatNone",
-    }
+    for i in range(4):
+        if i:
+            IsPlayback = True
+            AutoOpenLiveStream = True
+        else:
+            IsPlayback = False
+            AutoOpenLiveStream = False
+        resp = await c.postJson(
+            f"/Items/{obj.id}/PlaybackInfo",
+            AutoOpenLiveStream=AutoOpenLiveStream,
+            IsPlayback=IsPlayback,
+            MaxStreamingBitrate=42000000,
+            StartTimeTicks=0,
+            UserID=c.userid,
+            data=playback_info_data,
+        )
 
-    task = asyncio.create_task(c.get_stream_noreturn(direct_stream_id or f"/Videos/{obj.id}/stream"))
+    def get_playing_data(tick, update=False, stop=False):
+        data = {
+            "SubtitleOffset": 0,
+            "MaxStreamingBitrate": 420000000,
+            "MediaSourceId": str(media_source_id),
+            "SubtitleStreamIndex": -1,
+            "VolumeLevel": 100,
+            "PlaybackRate": 1,
+            "PlaybackStartTimeTicks": datetime.now().timestamp() * 10000000,
+            "PositionTicks": tick,
+            "PlaySessionId": play_session_id,
+        }
+        if update:
+            data["EventName"] = "timeupdate"
+        if stop:
+            queue = []
+        else:
+            queue = [{"Id": str(obj.id), "PlaylistItemId": "playlistItem0"}]
+        data.update(
+            {
+                "PlaylistLength": 1,
+                "NowPlayingQueue": queue,
+                "IsMuted": False,
+                "PlaylistIndex": 0,
+                "ItemId": str(obj.id),
+                "RepeatMode": "RepeatNone",
+                "AudioStreamIndex": -1,
+                "PlayMethod": "DirectStream",
+                "CanSeek": True,
+                "IsPaused": True,
+            }
+        )
+        return data
+
+    play_headers = {
+        "User-Agent": "VLC/3.0.21 LibVLC/3.0.21",
+        "X-Playback-Session-Id": play_session_id,
+    }
+    task = asyncio.create_task(
+        c.get_stream_noreturn(direct_stream_url or f"/Videos/{obj.id}/stream", headers=play_headers)
+    )
     Connector.playing_count += 1
     try:
         await asyncio.sleep(random.uniform(1, 3))
 
-        resp = await c.post("Sessions/Playing", MediaSourceId=media_source_id, data=playing_info(0))
+        resp = await c.post("Sessions/Playing", data=get_playing_data(0))
 
         if not is_ok(resp):
             raise PlayError("无法开始播放")
@@ -144,15 +293,13 @@ async def play(obj: EmbyObject, loggeruser: Logger, time: float = 10):
             if last_report_t and last_report_t - t > (5 if debug else 30):
                 loggeruser.info(f'正在播放: "{truncate_str(obj.name, 10)}" (还剩 {t:.0f} 秒).')
                 last_report_t = t
-            st = random.uniform(2, 5)
+            st = min(10, t)
             await asyncio.sleep(st)
             t -= st
             tick = int((time - t) * 10000000)
-            payload = playing_info(tick)
+            payload = get_playing_data(tick, update=True)
             try:
-                resp = await asyncio.wait_for(
-                    c.post("/Sessions/Playing/Progress", data=payload, EventName="timeupdate"), 10
-                )
+                resp = await asyncio.wait_for(c.post("/Sessions/Playing/Progress", data=payload), 10)
             except (httpx.HTTPError, asyncio.TimeoutError) as e:
                 loggeruser.debug(f"播放状态设定错误: {e}")
                 progress_errors += 1
@@ -160,7 +307,6 @@ async def play(obj: EmbyObject, loggeruser: Logger, time: float = 10):
                 if not is_ok(resp):
                     loggeruser.debug(f"播放状态设定错误: {resp}")
                     progress_errors += 1
-
         await asyncio.sleep(random.uniform(1, 3))
     finally:
         Connector.playing_count -= 1
@@ -175,7 +321,9 @@ async def play(obj: EmbyObject, loggeruser: Logger, time: float = 10):
 
     for retry in range(3):
         try:
-            if not is_ok(await c.post("/Sessions/Playing/Stopped", data=playing_info(time * 10000000))):
+            if not is_ok(
+                await c.post("/Sessions/Playing/Stopped", data=get_playing_data(time * 10000000, stop=True))
+            ):
                 if retry == 2:
                     raise PlayError("尝试停止播放3次后仍然失败")
                 loggeruser.debug(f"停止播放失败，正在进行第 {retry + 1}/3 次尝试")
@@ -216,52 +364,56 @@ async def get_cf_clearance(config, url, user_agent=None):
             return cf_clearance
     return None
 
+
 def get_device_uuid():
     rd = random.Random()
     rd.seed(uuid.getnode())
     return uuid.UUID(int=rd.getrandbits(128))
 
+
 def get_random_device():
-    device_type = random.choice(('iPhone', 'iPad'))
-    
+    device_type = random.choice(("iPhone", "iPad"))
+
     # All patterns with their weights
     patterns = [
-        ('chinese_normal', 20),
-        ('chinese_lastname_pinyin', 40),
-        ('chinese_firstname_pinyin', 10),
-        ('english_normal', 20),
-        ('english_upper', 10),
-        ('english_name_only', 10)
+        ("chinese_normal", 20),
+        ("chinese_lastname_pinyin", 40),
+        ("chinese_firstname_pinyin", 10),
+        ("english_normal", 20),
+        ("english_upper", 10),
+        ("english_name_only", 10),
     ]
-    
+
     pattern = random.choices([p[0] for p in patterns], weights=[p[1] for p in patterns])[0]
-    
-    if pattern.startswith('chinese'):
-        fake = Faker('zh_CN')
+
+    if pattern.startswith("chinese"):
+        fake = Faker("zh_CN")
         surname = fake.last_name()
         given_name = fake.first_name_male() if random.random() < 0.5 else fake.first_name_female()
-        
-        if pattern == 'chinese_normal':
+
+        if pattern == "chinese_normal":
             return f"{surname}{given_name}的{device_type}"
         else:
             from xpinyin import Pinyin
+
             p = Pinyin()
-            if pattern == 'chinese_lastname_pinyin':
+            if pattern == "chinese_lastname_pinyin":
                 pinyin = p.get_pinyin(surname).capitalize()
                 return f"{pinyin}的{device_type}"
             else:  # chinese_firstname_pinyin
-                pinyin = ''.join([word[0].upper() for word in p.get_pinyin(given_name).split('-')])
+                pinyin = "".join([word[0].upper() for word in p.get_pinyin(given_name).split("-")])
                 return f"{pinyin}的{device_type}"
     else:
-        fake = Faker('en_US')
+        fake = Faker("en_US")
         name = fake.first_name()
-        
-        if pattern == 'english_normal':
+
+        if pattern == "english_normal":
             return f"{name}'s {device_type}"
-        elif pattern == 'english_upper':
+        elif pattern == "english_upper":
             return f"{name.upper()}{device_type.upper()}"
         else:  # english_name_only
             return name
+
 
 async def get_fake_headers(
     basedir: Path,
@@ -275,7 +427,7 @@ async def get_fake_headers(
     headers = {}
     cache_dir = basedir / "emby_headers"
     cache_file = cache_dir / f"{hostname}.json"
-    
+
     async with cache_lock:
         cache_dir.mkdir(exist_ok=True, parents=True)
         cached_headers = {}
@@ -284,14 +436,14 @@ async def get_fake_headers(
                 cached_headers = json.loads(cache_file.read_text())
             except (json.JSONDecodeError, OSError) as e:
                 logger.debug(f"读取 Emby 请求头缓存失败: {e}")
-    
+
     # 按优先级获取各个值
     client = client or cached_headers.get("client") or "Fileball"
     device = device or cached_headers.get("device") or get_random_device()
     device_id = device_id or cached_headers.get("device_id") or str(get_device_uuid()).upper()
     version = client_version or cached_headers.get("client_version") or f"1.3.{random.randint(28, 30)}"
     ua = ua or cached_headers.get("ua") or f"Fileball/{version}"
-    
+
     # 构建认证头
     auth_headers = {
         "Client": client,
@@ -299,15 +451,14 @@ async def get_fake_headers(
         "DeviceId": device_id,
         "Version": version,
     }
-    auth_header = f"Emby {','.join([f'{k}={urllib.parse.quote(str(v))}' for k, v in auth_headers.items()])}"
-    
+    auth_header = ",".join([f"{k}={urllib.parse.quote(str(v))}" for k, v in auth_headers.items()])
+
     # 构建完整请求头
     headers["User-Agent"] = ua
-    headers["X-Emby-Authorization"] = auth_header
     headers["Accept-Language"] = "zh-CN,zh-Hans;q=0.9"
     headers["Content-Type"] = "application/json"
     headers["Accept"] = "*/*"
-    
+
     # 保存到缓存
     async with cache_lock:
         try:
@@ -316,13 +467,14 @@ async def get_fake_headers(
                 "device": device,
                 "device_id": device_id,
                 "client_version": version,
-                "ua": ua
+                "ua": ua,
             }
             cache_file.write_text(json.dumps(cache_data, indent=2))
         except OSError as e:
             logger.debug(f"保存 headers 缓存失败: {e}")
-            
-    return headers
+
+    return headers, auth_header
+
 
 async def login(config, continuous=None, per_site=None):
     """登录账号."""
@@ -354,11 +506,12 @@ async def login(config, continuous=None, per_site=None):
                         device_id_file.write_text(device_id)
                     except OSError as e:
                         logger.debug(f"保存 device_id 文件失败: {e}")
+
             if not a["password"]:
                 logger.warning(f'Emby "{a["url"]}" 未设置密码, 可能导致登陆失败.')
-            
+
             hostname = urlparse(a["url"]).netloc
-            headers = await get_fake_headers(
+            headers, auth_header = await get_fake_headers(
                 basedir=basedir,
                 hostname=hostname,
                 ua=a.get("ua", None),
@@ -367,7 +520,7 @@ async def login(config, continuous=None, per_site=None):
                 client_version=a.get("client_version", None),
                 device_id=device_id,
             )
-            
+
             emby = Emby(
                 url=a["url"],
                 username=a["username"],
@@ -375,6 +528,8 @@ async def login(config, continuous=None, per_site=None):
                 jellyfin=a.get("jellyfin", False),
                 proxy=config.get("proxy", None) if a.get("use_proxy", True) else None,
                 headers=headers,
+                basedir=basedir,
+                auth_header=auth_header,
                 cf_clearance=cf_clearance,
             )
             try:
@@ -521,7 +676,7 @@ async def watch(
                             except asyncio.TimeoutError:
                                 loggeruser.debug(f"从最近播放中隐藏视频超时.")
             else:
-                loggeruser.warning(f"由于没有成功播放视频, 保活失败, 请重新检查配置.")
+                loggeruser.warning(f"由于没有获取到可播放视频, 保活失败, 请重新检查配置.")
                 return False
         except httpx.HTTPError as e:
             retry += 1

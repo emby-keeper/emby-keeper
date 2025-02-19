@@ -16,6 +16,7 @@ from ._base import Monitor
 
 class _PornembyAnswerResultMonitor(Monitor):
     name = "Pornemby 问题答案"
+    chat_except_keyword = "猜猜是什么番号"
     chat_keyword = r"问题\d*：(.*?)\n+A:(.*)\n+B:(.*)\n+C:(.*)\n+D:(.*)\n+答案为：([ABCD])"
     additional_auth = ["pornemby_pack"]
     allow_edit = True
@@ -39,6 +40,7 @@ class _PornembyAnswerAnswerMonitor(Monitor):
         "Porn_Emby_Bot",
         "Porn_Emby_Scriptbot",
     ]
+    chat_except_keyword = "猜猜是什么番号"
     chat_keyword = r"问题\d*：(.*?)\n+(A:.*\n+B:.*\n+C:.*\n+D:.*)\n(?!\n*答案)"
     additional_auth = ["pornemby_pack"]
 

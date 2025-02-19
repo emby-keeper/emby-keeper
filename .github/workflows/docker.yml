@@ -12,6 +12,7 @@ on:
 
 env:
   REGISTRY_IMAGE: embykeeper/embykeeper
+  HF_SPACE_REPO: embykeeper/ek
 
 permissions:
   contents: read
@@ -130,7 +131,7 @@ jobs:
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
           git init
-          git remote add origin https://${{ secrets.HF_USERNAME }}:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/${{ env.REGISTRY_IMAGE }}
+          git remote add origin https://${{ secrets.HF_USERNAME }}:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/${{ env.HF_SPACE_REPO }}
           git add .
           git commit -m "Update Dockerfile"
           git pull origin main --rebase -Xtheirs

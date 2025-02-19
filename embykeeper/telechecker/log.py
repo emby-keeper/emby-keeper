@@ -31,12 +31,14 @@ class TelegramStream(io.TextIOWrapper):
         while True:
             message = await self.queue.get()
             try:
-                result = await asyncio.wait_for(self.send(message), 30)
+                result = await asyncio.wait_for(self.send(message), 10)
             except asyncio.TimeoutError:
                 logger.warning("推送消息到 Telegram 超时.")
             else:
                 if not result:
                     logger.warning(f'推送消息到 Telegram 失败: 无法登录 {self.account["phone"]}.')
+            finally:
+                self.queue.task_done()
 
     async def send(self, message):
         async with ClientsSession([self.account], proxy=self.proxy, basedir=self.basedir) as clients:

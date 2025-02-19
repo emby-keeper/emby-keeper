@@ -15,7 +15,7 @@ import random
 import sqlite3
 import struct
 import sys
-from typing import AsyncGenerator, Optional, Union
+from typing import AsyncGenerator, List, Optional, Union
 from sqlite3 import OperationalError
 import logging
 import tempfile
@@ -465,13 +465,14 @@ class Client(pyrogram.Client):
                     except RPCError:
                         continue
 
-                dialogs = []
-
+                dialogs: List[types.Dialog] = []
+                raw_dialogs: List[raw.types.Dialog] = []
                 for dialog in r.dialogs:
                     if not isinstance(dialog, raw.types.Dialog):
                         continue
                     try:
                         dialogs.append(types.Dialog._parse(self, dialog, messages, users, chats))
+                        raw_dialogs.append(dialog)
                     except BadRequest:
                         continue
 
@@ -479,9 +480,13 @@ class Client(pyrogram.Client):
                     return
 
                 last = dialogs[-1]
-
-                offset_id = last.top_message.id
-                offset_date = utils.datetime_to_timestamp(last.top_message.date)
+                raw_last: raw.types.Dialog = raw_dialogs[-1]
+                if not last.top_message:
+                    offset_id = raw_last.top_message
+                    offset_date = None
+                else:
+                    offset_id = last.top_message.id
+                    offset_date = utils.datetime_to_timestamp(last.top_message.date)
                 offset_peer = await self.resolve_peer(last.chat.id)
 
                 _, cache = await self.cache.get(cache_id, ((0, 0, raw.types.InputPeerEmpty()), []))
@@ -495,6 +500,18 @@ class Client(pyrogram.Client):
 
                     if current >= total:
                         return
+
+    async def invoke(self, query, *args, **kw):
+        for _ in range(3):
+            try:
+                return await super().invoke(query, *args, **kw)
+            except OSError:
+                await asyncio.sleep(0.5)
+                continue
+        else:
+            raise OSError(
+                f"Fail to invoke Telegram function due to network error ({query.__class__.__name__})"
+            )
 
     @asynccontextmanager
     async def catch_reply(self, chat_id: Union[int, str], outgoing=False, filter=None):
@@ -948,12 +965,12 @@ class ClientsSession:
             self.__class__.watch = asyncio.create_task(self.watchdog())
 
     async def test_network(self, proxy=None):
-        url = "https://www.gstatic.com/generate_204"
+        url = "https://telegram.org"
         proxy_str = get_proxy_str(proxy)
         try:
-            async with httpx.AsyncClient(http2=True, proxy=proxy_str) as client:
-                resp = await client.get(url)
-                if resp.status_code == 204:
+            async with httpx.AsyncClient(http2=True, proxy=proxy_str, timeout=20) as client:
+                resp = await client.head(url)
+                if resp.status_code == 200:
                     return True
                 else:
                     logger.warning(f"检测网络状态时发生错误, 网络检测将被跳过.")
@@ -964,8 +981,8 @@ class ClientsSession:
                     f"无法连接到您的代理 ({proxy_str}), 您的网络状态可能不好, 敬请注意. 程序将继续运行."
                 )
             return False
-        except httpx.ConnectError:
-            logger.warning(f"无法连接到网络 (Google), 您的网络状态可能不好, 敬请注意. 程序将继续运行.")
+        except (httpx.ConnectError, httpx.ConnectTimeout):
+            logger.warning(f"无法连接到 Telegram 服务器, 您的网络状态可能不好, 敬请注意. 程序将继续运行.")
             return False
         except Exception as e:
             logger.warning(f"检测网络状态时发生错误, 网络检测将被跳过.")
@@ -1029,21 +1046,27 @@ class ClientsSession:
             msg2 = f'请输入 "{account["phone"]}" 的登陆验证码 (按回车确认)'
             code_callback = lambda: Prompt.ask(" " * 23 + msg2, console=var.console)
 
-            try:
-                await TelethonUtils.start(
-                    client,
-                    phone=account["phone"],
-                    password=password_callback,
-                    code_callback=code_callback,
-                )
-                session_string = StringSession.save(client.session)
-                me = await client.get_me()
-                user_id = me.id
-                user_bot = me.bot
-            except RuntimeError:
+            for _ in range(3):
+                try:
+                    await TelethonUtils.start(
+                        client,
+                        phone=account["phone"],
+                        password=password_callback,
+                        code_callback=code_callback,
+                    )
+                    session_string = StringSession.save(client.session)
+                    me = await client.get_me()
+                    user_id = me.id
+                    user_bot = me.bot
+                except asyncio.IncompleteReadError:
+                    logger.warning(f'登录账号 "{account["phone"]}" 时发生网络错误, 将在 3 秒后重试.')
+                    await asyncio.sleep(1)
+                else:
+                    break
+                finally:
+                    await client.disconnect()
+            else:
                 return None
-            finally:
-                await client.disconnect()
 
         session = StringSession(session_string)
         Dt = Storage.SESSION_STRING_FORMAT
@@ -1070,7 +1093,7 @@ class ClientsSession:
             session_file = Path(self.basedir) / f'{account["phone"]}.session'
             session_string_file = Path(self.basedir) / f'{account["phone"]}.login'
             if not self.quiet:
-                logger.info(f'登录至账号 "{account["phone"]}".')
+                logger.info(f'登录至账号 "{account["phone"]}", 请耐心等待.')
             for _ in range(3):
                 if account.get("api_id", None) is None or account.get("api_hash", None) is None:
                     account.update(random.choice(list(API_KEY.values())))
@@ -1199,7 +1222,7 @@ class ClientsSession:
 
     async def loginer(self, index, account):
         client = await self.login(index, account, proxy=self.proxy)
-        if isinstance(client, Client):
+        if isinstance(client, Client) and client.me:
             async with self.lock:
                 phone = account["phone"]
                 self.pool[phone] = (client, 1)
@@ -1222,6 +1245,7 @@ class ClientsSession:
                         await self.pool[phone]
                         await self.lock.acquire()
                     if isinstance(self.pool[phone], asyncio.Task):
+                        await self.done.put(None)
                         continue
                     client, ref = self.pool[phone]
                     ref += 1
