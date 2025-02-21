@@ -1,4 +1,5 @@
 from pyrogram.types import Message
+from pyrogram.errors import MessageIdInvalid
 from pyrogram.raw.types.messages import BotCallbackAnswer
 
 from embykeeper.utils import to_iterable
@@ -28,6 +29,8 @@ class TemplateACheckin(BotCheckin):
                         answer: BotCallbackAnswer = await message.click(k)
                     except TimeoutError:
                         self.log.debug(f"点击签到按钮无响应, 可能按钮未正确处理点击回复. 一般来说不影响签到.")
+                    except MessageIdInvalid:
+                        pass
                     else:
                         if self.use_button_answer:
                             if not any(ignore in answer.message for ignore in self.bot_text_ignore_answer):

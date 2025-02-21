@@ -1,3 +1,4 @@
+import binascii
 import os
 from pathlib import Path
 import re
@@ -407,7 +408,11 @@ async def interactive_config(config: dict = {}, basedir=None):
 def load_env_config(data: str):
     """从来自环境变量的加密数据读入配置."""
 
-    data = base64.b64decode(re.sub(r"\s+", "", data).encode())
+    try:
+        data = base64.b64decode(re.sub(r"\s+", "", data).encode())
+    except binascii.Error:
+        logger.error("配置格式错误, 请调整并重试.")
+        sys.exit(252)
     try:
         config = tomllib.loads(data.decode())
     except (tomllib.TOMLDecodeError, UnicodeDecodeError):

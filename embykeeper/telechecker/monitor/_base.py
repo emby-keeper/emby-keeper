@@ -260,7 +260,7 @@ class Monitor:
         ):
             return
         text = message.text or message.caption
-        if cls.chat_except_keyword:
+        if text and cls.chat_except_keyword:
             for k in to_iterable(cls.chat_except_keyword):
                 if re.search(k, text, re.IGNORECASE):
                     return

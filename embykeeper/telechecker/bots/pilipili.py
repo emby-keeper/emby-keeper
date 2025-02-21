@@ -3,6 +3,7 @@ import random
 import re
 from pyrogram.types import Message
 from pyrogram.raw.types.messages import BotCallbackAnswer
+from pyrogram.errors import MessageIdInvalid
 
 from ._base import BotCheckin
 
@@ -26,7 +27,7 @@ class PilipiliCheckin(BotCheckin):
                     try:
                         answer: BotCallbackAnswer = await message.click(k)
                         await self.on_text(Message(id=0), answer.message)
-                    except TimeoutError:
+                    except (TimeoutError, MessageIdInvalid):
                         pass
                     return
             else:

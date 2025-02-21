@@ -6,6 +6,7 @@ from urllib.parse import parse_qs, urlparse
 
 from pyrogram.types import Message
 from pyrogram.raw.functions.messages import RequestWebView
+from pyrogram.errors import MessageIdInvalid
 from faker import Faker
 import httpx
 
@@ -21,6 +22,7 @@ class FutureCheckin(BotCheckin):
     bot_use_captcha = False
     bot_checkin_cmd = "/start"
     bot_text_ignore = ["請先完成驗證"]
+    bot_fail_keywords = ["不能签到"]
     additional_auth = ["captcha"]
     max_retries = 2
 
@@ -101,7 +103,7 @@ class FutureCheckin(BotCheckin):
                 if any([i in k for i in self.click_button]):
                     try:
                         await message.click(k)
-                    except TimeoutError:
+                    except (MessageIdInvalid, TimeoutError):
                         pass
                     return
             else:

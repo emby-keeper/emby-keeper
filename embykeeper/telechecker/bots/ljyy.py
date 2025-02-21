@@ -1,6 +1,7 @@
 import asyncio
 
 from pyrogram.types import Message
+from pyrogram.errors import MessageIdInvalid
 from thefuzz import fuzz
 
 from ._base import AnswerBotCheckin
@@ -27,7 +28,7 @@ class LJYYCheckin(AnswerBotCheckin):
                     async with self.client.catch_reply(self.bot_username) as f:
                         try:
                             await message.click(k)
-                        except TimeoutError:
+                        except (TimeoutError, MessageIdInvalid):
                             pass
                         try:
                             await asyncio.wait_for(f, 10)

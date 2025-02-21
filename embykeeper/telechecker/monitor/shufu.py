@@ -1,6 +1,7 @@
 import asyncio
 from pyrogram.types import Message
 from pyrogram import filters
+from pyrogram.errors import MessageIdInvalid
 
 from embykeeper.utils import async_partial
 
@@ -33,7 +34,7 @@ class ShufuMonitor(Monitor):
                             ) as f:
                                 try:
                                     await msg.click(k)
-                                except TimeoutError:
+                                except (TimeoutError, MessageIdInvalid):
                                     pass
                                 try:
                                     await asyncio.wait_for(f, 10)

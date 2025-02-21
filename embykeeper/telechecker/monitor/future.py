@@ -5,6 +5,7 @@ from urllib.parse import parse_qs, urlparse
 from pyrogram import filters
 from pyrogram.types import Message
 from pyrogram.raw.functions.messages import RequestWebView
+from pyrogram.errors import MessageIdInvalid
 import httpx
 from faker import Faker
 
@@ -66,7 +67,7 @@ class FutureMonitor(Monitor):
                 async with self.client.catch_edit(msg, ~filters.regex("请先完成验证")) as f2:
                     try:
                         msg = await msg.click("💡註冊帳戶", timeout=1)
-                    except TimeoutError:
+                    except (TimeoutError, MessageIdInvalid):
                         pass
                     except ValueError:
                         self.log.error("未能找到注册按钮, 无法注册.")

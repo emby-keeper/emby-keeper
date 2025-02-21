@@ -1,6 +1,7 @@
 from ._base import BotCheckin
 
 from pyrogram.types import Message
+from pyrogram.errors import MessageIdInvalid
 
 __ignore__ = True
 
@@ -19,7 +20,7 @@ class UnionSGKCheckin(BotCheckin):
                 if "签到" in k:
                     try:
                         await message.click(k)
-                    except TimeoutError:
+                    except (TimeoutError, MessageIdInvalid):
                         pass
                     return
             else:

@@ -20,9 +20,7 @@ class PornembyRegisterMonitor(Monitor):
             return
         try:
             await message.click(0)
-        except TimeoutError:
-            self.log.info("检测到 Pornemby 抢注, 已点击, 请自行查看结果.")
-        except RPCError:
+        except (TimeoutError, RPCError):
             self.log.info("检测到 Pornemby 抢注, 已点击, 请自行查看结果.")
         else:
             self.log.info("检测到 Pornemby 抢注, 已点击, 请自行查看结果.")

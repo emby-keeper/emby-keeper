@@ -3,9 +3,9 @@ from ._base import BotCheckin
 __ignore__ = True
 
 
-class ShziCheckin(BotCheckin):
-    name = "Shzi"
-    bot_username = "aishuazibot"
+class OixelCheckin(BotCheckin):
+    name = "Oixel"
+    bot_username = "oixel_bot"
     bot_checkin_cmd = "📅 签到"
     additional_auth = ["prime"]
     max_retries = 6

@@ -1,4 +1,5 @@
 from pyrogram.types import Message
+from pyrogram.errors import MessageIdInvalid
 
 from ._base import BotCheckin
 
@@ -17,7 +18,7 @@ class MagicCheckin(BotCheckin):
                 if "签到" in k:
                     try:
                         await message.click(k)
-                    except TimeoutError:
+                    except (TimeoutError, MessageIdInvalid):
                         pass
                     return
             else:
