@@ -6,7 +6,7 @@ import random
 import re
 
 from pyrogram.types import Message
-from pyrogram.errors import RPCError
+from pyrogram.errors import RPCError, MessageIdInvalid
 
 from ...utils import to_iterable, truncate_str
 from ..link import Link
@@ -183,7 +183,7 @@ class _PornembyAnswerAnswerMonitor(Monitor):
                 if any((o in button_text) for o in answer_options):
                     try:
                         await message.click(button_text)
-                    except TimeoutError:
+                    except (TimeoutError, MessageIdInvalid):
                         pass
                     break
             else:

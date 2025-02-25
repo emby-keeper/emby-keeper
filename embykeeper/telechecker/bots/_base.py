@@ -1,6 +1,5 @@
 import asyncio
 from datetime import datetime, timedelta
-from pathlib import Path
 import random
 import re
 from abc import ABC, abstractmethod
@@ -12,7 +11,6 @@ from typing import Iterable, List, Optional, Union
 
 from appdirs import user_data_dir
 from loguru import logger
-from PIL import Image
 from pyrogram import filters
 from pyrogram.errors import (
     UsernameNotOccupied,
@@ -20,6 +18,7 @@ from pyrogram.errors import (
     UsernameInvalid,
     ChannelInvalid,
     ChannelPrivate,
+    MessageIdInvalid,
 )
 from pyrogram.handlers import EditedMessageHandler, MessageHandler
 from pyrogram.types import InlineKeyboardMarkup, Message, ReplyKeyboardMarkup
@@ -31,7 +30,6 @@ from embykeeper import __name__ as __product__
 from embykeeper.ocr import CharRange, OCRService
 from embykeeper.utils import show_exception, to_iterable, format_timedelta_human, AsyncCountPool
 
-from ..lock import ocrs, ocrs_lock
 from ..tele import Client
 from ..link import Link
 
@@ -583,7 +581,7 @@ class BotCheckin(BaseBotCheckin):
                     "形式为: [CLICK]^XXX^, 其中XXX为回答\n"
                 )
             prompt += (
-                "如果您认为不应该进行任何操作, 请输出 [NO_RESP], 禁止输出其他内容..\n"
+                "如果您认为不应该进行任何操作, 请输出 [NO_RESP], 禁止输出其他内容.\n"
                 "如果这是一个指令, 请输出您需要发送或点击的内容.\n"
                 "形式为: [SEND]^XXX^, 其中XXX为内容\n"
                 "不要说明这是一个指令, 不要说明需要发送文本消息, 仅仅按上述形式输出.\n"
@@ -619,7 +617,7 @@ class BotCheckin(BaseBotCheckin):
                         else:
                             try:
                                 await message.click(b)
-                            except TimeoutError:
+                            except (TimeoutError, MessageIdInvalid):
                                 pass
                             self.log.warning(f'智能回答点击了按钮 "{b}", 为了避免风险签到器将停止.')
                             await self.fail()
@@ -770,5 +768,5 @@ class AnswerBotCheckin(BotCheckin):
             else:
                 try:
                     await self.message.click(max_k)
-                except TimeoutError:
+                except (TimeoutError, MessageIdInvalid):
                     pass

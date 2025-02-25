@@ -37,7 +37,7 @@ class CharonCheckin(BotCheckin):
     async def handle_url(self, url: str):
         self.log.debug(f"即将解析网页中的验证码: {url}.")
         for i in range(3):
-            _, result = await Link(self.client).captcha_url("charon", url)
+            result = await Link(self.client).captcha_content("charon", url)
             if result:
                 await self.client.send_message(self.bot_username, result)
                 break

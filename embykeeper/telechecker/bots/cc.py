@@ -4,6 +4,7 @@ import string
 
 from thefuzz import process
 from pyrogram.types import Message
+from pyrogram.errors import MessageIdInvalid
 
 from ..link import Link
 from ._base import BotCheckin
@@ -25,7 +26,7 @@ class CCCheckin(BotCheckin):
                 if "签到" in k:
                     try:
                         await message.click(k)
-                    except TimeoutError:
+                    except (TimeoutError, MessageIdInvalid):
                         pass
                     return
             else:
@@ -56,5 +57,5 @@ class CCCheckin(BotCheckin):
         await asyncio.sleep(random.uniform(2, 4))
         try:
             await message.click(captcha)
-        except TimeoutError:
+        except (TimeoutError, MessageIdInvalid):
             pass

@@ -4,5 +4,5 @@ __ignore__ = True
 
 
 class AivbiCheckin(TemplateACheckin):
-    name = "AVIBI"
+    name = "AIVBI"
     bot_username = "AIVBIbot"

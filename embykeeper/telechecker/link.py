@@ -251,16 +251,16 @@ class Link:
         else:
             return None
 
-    async def captcha_url(self, site: str, url: str = None):
+    async def captcha_content(self, site: str, url: str = None):
         """向机器人发送带验证码的远程网页解析请求."""
         cmd = f"/captcha {self.instance} {site}"
         if url:
             cmd += f" {url}"
         results = await self.post(cmd, timeout=240, name="请求跳过验证码")
         if results:
-            return results.get("cf_clearance", None), results.get("result", None)
+            return results.get("content", None)
         else:
-            return None, None
+            return None
 
     async def resocks(self):
         """向机器人发送逆向 Socks 代理隧道监听请求."""

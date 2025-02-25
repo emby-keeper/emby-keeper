@@ -5,6 +5,7 @@ import re
 
 import httpx
 from pyrogram.types import Message
+from pyrogram.errors import MessageIdInvalid
 from PIL import Image
 import numpy as np
 
@@ -243,7 +244,7 @@ class _PornembyExamAnswerMonitor(Monitor):
                 if any((o in button_text) for o in answer_options):
                     try:
                         await message.click(button_text)
-                    except TimeoutError:
+                    except (TimeoutError, MessageIdInvalid):
                         pass
                     break
             else:

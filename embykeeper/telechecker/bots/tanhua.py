@@ -1,4 +1,5 @@
 from pyrogram.types import Message
+from pyrogram.errors import MessageIdInvalid
 
 from embykeeper.utils import to_iterable
 
@@ -27,7 +28,7 @@ class TanhuaCheckin(AnswerBotCheckin):
                 if "个人信息" in k:
                     try:
                         await message.click(k)
-                    except TimeoutError:
+                    except (TimeoutError, MessageIdInvalid):
                         pass
                     return
                 if "签到" in k or "簽到" in k:
@@ -35,6 +36,8 @@ class TanhuaCheckin(AnswerBotCheckin):
                         await message.click(k)
                     except TimeoutError:
                         self.log.debug(f"点击签到按钮无响应, 可能按钮未正确处理点击回复. 一般来说不影响签到.")
+                    except MessageIdInvalid:
+                        pass
                     return
             else:
                 self.log.warning(f"签到失败: 账户错误.")

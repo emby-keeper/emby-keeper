@@ -2,7 +2,7 @@ import asyncio
 import random
 
 from pyrogram.types import Message
-from pyrogram.errors import BadRequest
+from pyrogram.errors import BadRequest, MessageIdInvalid
 
 from ._base import AnswerBotCheckin
 
@@ -23,7 +23,7 @@ class PornembyCheckin(AnswerBotCheckin):
         async with self.client.catch_reply(self.bot_username) as f:
             try:
                 await message.click("点击签到")
-            except TimeoutError:
+            except (TimeoutError, MessageIdInvalid):
                 pass
             except BadRequest:
                 self.log.warning(f"签到失败: 账户错误.")

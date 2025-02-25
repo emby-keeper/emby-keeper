@@ -1,4 +1,5 @@
 from pyrogram.types import Message
+from pyrogram.errors import MessageIdInvalid
 
 from ._base import BotCheckin
 
@@ -20,6 +21,8 @@ class M78Checkin(BotCheckin):
                         await message.click(k)
                     except TimeoutError:
                         self.log.debug(f"点击签到按钮无响应, 可能按钮未正确处理点击回复. 一般来说不影响签到.")
+                    except MessageIdInvalid:
+                        pass
                     return
             else:
                 self.log.warning(f"签到失败: 账户错误.")

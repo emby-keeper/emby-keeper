@@ -199,7 +199,7 @@ docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper -
     - 叮当猫社工库 (`dingdangsgk`): [机器人](https://t.me/DingDangCats_Bot?start=d9bb127efc6127d1)
     - 魔神社工库 (`moshensgk`): [机器人](https://t.me/moshensgk_bot?start=NjQ4OTg5NjQxNA==)
     - Bost 社工库 (`bostsgk`): [机器人](https://t.me/BOST_SGK_BOT?start=6489896414)
-    - Shzi (`shzi`): [机器人](https://t.me/aishuazibot?start=QvSBSqCG)
+    - Oixel (`oixel`): [机器人](https://t.me/oixel_bot?start=QvSBSqCG)
     - 飞机工具箱 (`feiji`): [机器人](https://t.me/fjtool_bot?start=6489896414C44)
     - 鸟哥轰炸 (`niaoge`): [机器人](https://t.me/nb3344bot?start=6489896414)
     - Bytevirt (`bytevirt_group`): [群组](https://t.me/bytevirtchat)

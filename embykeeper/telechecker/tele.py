@@ -44,6 +44,7 @@ from pyrogram.errors import (
     PhoneNumberBanned,
     BadRequest,
     AuthKeyDuplicated,
+    MessageIdInvalid,
 )
 from pyrogram.storage.storage import Storage
 from pyrogram.handlers import (
@@ -483,7 +484,7 @@ class Client(pyrogram.Client):
                 raw_last: raw.types.Dialog = raw_dialogs[-1]
                 if not last.top_message:
                     offset_id = raw_last.top_message
-                    offset_date = None
+                    offset_date = 0
                 else:
                     offset_id = last.top_message.id
                     offset_date = utils.datetime_to_timestamp(last.top_message.date)
@@ -585,7 +586,7 @@ class Client(pyrogram.Client):
             if click:
                 try:
                     await message.click(click)
-                except TimeoutError:
+                except (TimeoutError, MessageIdInvalid):
                     if noanswer:
                         pass
                     else:

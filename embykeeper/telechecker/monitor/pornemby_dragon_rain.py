@@ -32,10 +32,8 @@ class PornembyDragonRainMonitor:
                                 return
                             try:
                                 await message.click(b.text)
-                            except TimeoutError:
+                            except (TimeoutError, RPCError):
                                 self.log.info("检测到 Pornemby 抢红包雨, 已点击抢红包, 等待结果.")
-                            except RPCError:
-                                self.log.info("检测到 Pornemby 抢红包雨, 但没有抢到红包.")
                             else:
                                 self.log.info("检测到 Pornemby 抢红包雨, 已点击抢红包, 等待结果.")
                             return
