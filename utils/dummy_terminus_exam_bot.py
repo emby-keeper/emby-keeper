@@ -19,7 +19,9 @@ from pyrogram.types import (
 )
 
 from embykeeper.utils import AsyncTyper
-from embykeeper.telechecker.tele import Client, API_KEY
+from embykeeper.telegram.pyrogram import Client
+from embykeeper.config import config
+from embykeeper.telegram.session import API_ID, API_HASH
 
 user_states = {}
 app = AsyncTyper()
@@ -175,21 +177,18 @@ def generate_random_id():
 
 
 @app.async_command()
-async def main(config: Path):
+async def main(config_file: Path):
     global questions
     questions = load_exam_questions()
-    with open(config, "rb") as f:
-        config = tomllib.load(f)
-    for k in API_KEY.values():
-        api_id = k["api_id"]
-        api_hash = k["api_hash"]
+    await config.reload_conf(config_file)
     bot = Client(
         name="test_bot",
-        bot_token=config["bot"]["token"],
-        proxy=config.get("proxy", None),
+        bot_token=config.bot.token,
+        proxy=config.proxy.model_dump(),
         workdir=Path(__file__).parent,
-        api_id=api_id,
-        api_hash=api_hash,
+        api_id=API_ID,
+        api_hash=API_HASH,
+        in_memory=True,
     )
     async with bot:
         await bot.add_handler(MessageHandler(dump), group=1)

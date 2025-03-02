@@ -1,14 +1,14 @@
 from pathlib import Path
 import random
 from tqdm import tqdm
-import tomli as tomllib
 
 from ddddocr import DdddOcr
 from PIL import Image
 from pyrogram.enums import ParseMode
 
-from embykeeper.telechecker.tele import ClientsSession
+from embykeeper.telegram.session import ClientsSession
 from embykeeper.utils import AsyncTyper
+from embykeeper.config import config
 
 app = AsyncTyper()
 
@@ -17,12 +17,10 @@ chat = "api_group"
 
 
 @app.async_command()
-async def generate(config: Path, output: Path = "captchas.txt"):
-    with open(config, "rb") as f:
-        config = tomllib.load(f)
-    proxy = config.get("proxy", None)
-    async with ClientsSession(config["telegram"][:1], proxy=proxy) as clients:
-        async for tg in clients:
+async def generate(config_file: Path, output: Path = "captchas.txt"):
+    await config.reload_conf(config_file)
+    async with ClientsSession(config.telegram.account[:1]) as clients:
+        async for _, tg in clients:
             photos = []
             try:
                 async for msg in tg.get_chat_history(bot):
@@ -34,17 +32,15 @@ async def generate(config: Path, output: Path = "captchas.txt"):
 
 
 @app.async_command()
-async def label(config: Path, inp: Path = "captchas.txt", onnx: Path = None, charsets: Path = None):
+async def label(config_file: Path, inp: Path = "captchas.txt", onnx: Path = None, charsets: Path = None):
+    await config.reload_conf(config_file)
     ocr = DdddOcr(beta=True, show_ad=False, import_onnx_path=str(onnx), charsets_path=str(charsets))
     output = Path(__file__).parent / "data"
     output.mkdir(exist_ok=True, parents=True)
     with open(inp) as f:
         photos = [l.strip() for l in f.readlines()]
         random.shuffle(photos)
-    with open(config, "rb") as f:
-        config = tomllib.load(f)
-    proxy = config.get("proxy", None)
-    async with ClientsSession(config["telegram"][:1], proxy=proxy) as clients:
+    async with ClientsSession(config.telegram.account[:1]) as clients:
         async for tg in clients:
             for photo in tqdm(photos, desc="标记验证码"):
                 data = await tg.download_media(photo, in_memory=True)

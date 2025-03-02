@@ -7,6 +7,8 @@ from rich.logging import RichHandler
 from . import var
 from .utils import to_iterable
 
+pad = " " * 23
+
 scheme_names = {
     "telegram": "Telegram",
     "telechecker": "每日签到",
@@ -18,6 +20,8 @@ scheme_names = {
     "subsonic": "Subsonic保活",
     "datamanager": "下载器",
     "debugtool": "开发工具",
+    "config": "配置文件",
+    "cfsolver": "验证解析",
 }
 
 
@@ -38,14 +42,12 @@ def formatter(record):
         name = ifextra("name", "([magenta]{}[/]) ")
         return f"[blue]{scheme_names[scheme]}[/]{username}: {name}{{message}}"
     elif scheme == "embywatcher":
-        ident = ifextra(["server", "username"], " ([cyan]{}:{}[/])")
+        ident = ifextra(["username", "server"], " ([cyan]{}@{}[/])")
         return f"[blue]{scheme_names[scheme]}[/]{ident}: {{message}}"
     elif scheme == "subsonic":
-        ident = ifextra(["server", "username"], " ([cyan]{}:{}[/])")
+        ident = ifextra(["username", "server"], " ([cyan]{}@{}[/])")
         return f"[blue]{scheme_names[scheme]}[/]{ident}: {{message}}"
-    elif scheme == "datamanager":
-        return f"[blue]{scheme_names[scheme]}[/]: {{message}}"
-    elif scheme == "debugtool":
+    elif scheme in ("datamanager", "debugtool", "config", "cfsolver"):
         return f"[blue]{scheme_names[scheme]}[/]: {{message}}"
     else:
         return "{message}"
@@ -53,9 +55,14 @@ def formatter(record):
 
 def initialize(level="INFO", **kw):
     """初始化日志配置."""
+
+    from asyncio import constants
+
     logger.remove()
     handler = RichHandler(
         console=var.console, markup=True, rich_tracebacks=True, tracebacks_suppress=[asyncio], **kw
     )
     handler.setFormatter(Formatter(None, "[%m/%d %H:%M]"))
     logger.add(handler, format=formatter, level=level, colorize=False)
+
+    constants.LOG_THRESHOLD_FOR_CONNLOST_WRITES = 1000000

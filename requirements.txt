@@ -7,16 +7,12 @@ appdirs
 loguru
 faker
 aiofiles
-aiohttp
-aiohttp-socks
 python-dateutil
 ddddocr>=1.5.5
-embypyfix
 kurigram==2.1.36
 tgcrypto
 pillow>10.0.0
 thefuzz[speedup]
-schema
 aiocache
 flask==3.0.3
 flask-socketio==5.3.6
@@ -34,3 +30,8 @@ socksio
 telethon
 psutil
 xpinyin
+curl_cffi
+pymongo
+pydantic
+watchfiles
+python-socks[asyncio]

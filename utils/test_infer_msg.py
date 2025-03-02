@@ -1,11 +1,12 @@
 from pathlib import Path
 
 import yaml
-import tomli as tomllib
 
-from embykeeper.telechecker.tele import ClientsSession, Client
-from embykeeper.telechecker.link import Link
+from embykeeper.telegram.session import ClientsSession
+from embykeeper.telegram.pyrogram import Client
+from embykeeper.telegram.link import Link
 from embykeeper.utils import AsyncTyper, truncate_str
+from embykeeper.config import config
 
 
 app = AsyncTyper()
@@ -63,12 +64,11 @@ async def call_infer(tg: Client, url: str = None, analyze: Path = None):
 
 
 @app.async_command()
-async def main(config: Path, url: str = None, analyze: Path = None):
-    with open(config, "rb") as f:
-        config = tomllib.load(f)
-    async with ClientsSession.from_config(config) as clients:
-        async for client in clients:
-            print(await call_infer(client, url, analyze))
+async def main(config_path: Path, url: str = None, analyze: Path = None):
+    await config.reload_conf(config_path)
+    async with ClientsSession(config.telegram.account) as clients:
+        async for _, tg in clients:
+            print(await call_infer(tg, url, analyze))
             break
 
 

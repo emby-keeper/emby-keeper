@@ -1,26 +1,30 @@
 from pathlib import Path
 import tomli as tomllib
 
-from embykeeper.telechecker.tele import ClientsSession
+from embykeeper.telegram.session import ClientsSession
 from embykeeper.utils import AsyncTyper
+from embykeeper.config import config
 
 app = AsyncTyper()
 
 
 @app.async_command()
-async def main(config: Path, spec: str):
-    with open(config, "rb") as f:
-        config = tomllib.load(f)
-    proxy = config.get("proxy", None)
-    async with ClientsSession(config["telegram"][:1], proxy=proxy) as clients:
-        async for tg in clients:
+async def main(config_file: Path, spec: str):
+    await config.reload_conf(config_file)
+    async with ClientsSession(config.telegram.account[:1]) as clients:
+        async for _, tg in clients:
             try:
-                spec = int(spec)
-            except:
-                pass
-            try:
+                # Try to convert spec to integer (for user_id)
+                try:
+                    spec = int(spec)
+                except ValueError:
+                    pass  # Keep as string (for username)
+
                 results = await tg.get_users(spec)
-                print(results)
+                if results:
+                    print(results)
+                else:
+                    print("User not found")
                 break
             except Exception as e:
                 print(f"Error: {e}")

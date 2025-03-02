@@ -1,19 +1,17 @@
 from pathlib import Path
-import tomli as tomllib
 
-from embykeeper.telechecker.tele import ClientsSession
+from embykeeper.telegram.session import ClientsSession
 from embykeeper.utils import AsyncTyper
+from embykeeper.config import config
 
 app = AsyncTyper()
 
 
 @app.async_command()
-async def main(config: Path, url: str):
-    with open(config, "rb") as f:
-        config = tomllib.load(f)
-    proxy = config.get("proxy", None)
-    async with ClientsSession(config["telegram"][:1], proxy=proxy) as clients:
-        async for tg in clients:
+async def main(config_file: Path, url: str):
+    await config.reload_conf(config_file)
+    async with ClientsSession(config.telegram.account[:1]) as clients:
+        async for _, tg in clients:
             try:
                 # Parse message URL to get chat_id and message_id
                 if not url.startswith("https://t.me/"):

@@ -16,8 +16,10 @@ from pyrogram.types import (
 )
 from pyrogram.enums import ParseMode
 
+from embykeeper.config import config
 from embykeeper.utils import AsyncTyper
-from embykeeper.telechecker.tele import Client, API_KEY
+from embykeeper.telegram.pyrogram import Client
+from embykeeper.telegram.session import API_ID, API_HASH
 
 app = AsyncTyper()
 
@@ -136,19 +138,15 @@ async def callback_yzm(client: Client, callback: CallbackQuery):
 
 
 @app.async_command()
-async def main(config: Path):
-    with open(config, "rb") as f:
-        config = tomllib.load(f)
-    for k in API_KEY.values():
-        api_id = k["api_id"]
-        api_hash = k["api_hash"]
+async def main(config_file: Path):
+    await config.reload_conf(config_file)
     bot = Client(
         name="test_bot",
-        bot_token=config["bot"]["token"],
-        proxy=config.get("proxy", None),
+        bot_token=config.bot.token,
+        proxy=config.proxy.model_dump(),
         workdir=Path(__file__).parent,
-        api_id=api_id,
-        api_hash=api_hash,
+        api_id=API_ID,
+        api_hash=API_HASH,
         in_memory=True,
     )
     async with bot:

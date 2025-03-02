@@ -1,6 +1,5 @@
 import asyncio
 import time
-from pathlib import Path
 from typing import Iterable, Union
 
 import aiofiles
@@ -9,6 +8,7 @@ from cachetools import TTLCache
 from loguru import logger
 
 from .utils import format_byte_human, nonblocking, show_exception, to_iterable, get_proxy_str
+from .config import config
 
 logger = logger.bind(scheme="datamanager")
 
@@ -22,11 +22,13 @@ versions = TTLCache(maxsize=128, ttl=600)
 lock = asyncio.Lock()
 
 
-async def refresh_version(connector):
+async def refresh_version():
     async with nonblocking(lock):
         for data_url in cdn_urls:
             url = f"{data_url}/version"
-            async with httpx.AsyncClient(http2=True, follow_redirects=True) as client:
+            async with httpx.AsyncClient(
+                http2=True, proxy=get_proxy_str(config.proxy), follow_redirects=True
+            ) as client:
                 try:
                     resp = await client.get(url)
                     if resp.status_code == 200:
@@ -50,17 +52,15 @@ async def refresh_version(connector):
             return False
 
 
-async def get_datas(basedir: Path, names: Union[Iterable[str], str], proxy: dict = None, caller: str = None):
+async def get_datas(names: Union[Iterable[str], str], caller: str = None):
     """
     获取额外数据.
     参数:
-        basedir: 文件存储默认位置
         names: 要下载的路径列表
-        proxy: 代理配置
         caller: 请求下载的模块名, 用于消息提示
     """
-    basedir.mkdir(parents=True, exist_ok=True)
 
+    basedir = config.basedir
     existing = {}
     not_existing = []
     for name in to_iterable(names):
@@ -83,9 +83,8 @@ async def get_datas(basedir: Path, names: Union[Iterable[str], str], proxy: dict
                     for data_url in cdn_urls:
                         url = f"{data_url}/data/{name}"
                         logger.debug(f"正在尝试 URL: {url}")
-                        proxy_url = get_proxy_str(proxy) if proxy else None
                         async with httpx.AsyncClient(
-                            http2=True, proxy=proxy_url, verify=False, follow_redirects=True
+                            http2=True, proxy=get_proxy_str(config.proxy), follow_redirects=True
                         ) as client:
                             try:
                                 resp = await client.get(url)
@@ -107,7 +106,7 @@ async def get_datas(basedir: Path, names: Union[Iterable[str], str], proxy: dict
                                     yield basedir / name
                                     break
                                 elif resp.status_code in (403, 404) and not version_matching:
-                                    await refresh_version(connector=None)
+                                    await refresh_version()
                                     if name in versions:
                                         logger.debug(f'解析版本 "{name}" -> "{versions[name]}"')
                                         name = versions[name]
@@ -141,6 +140,6 @@ async def get_datas(basedir: Path, names: Union[Iterable[str], str], proxy: dict
                 break
 
 
-async def get_data(basedir: Path, name: str, proxy: dict = None, caller: str = None):
-    async for data in get_datas(basedir, name, proxy, caller):
+async def get_data(name: str, caller: str = None):
+    async for data in get_datas(name, caller):
         return data

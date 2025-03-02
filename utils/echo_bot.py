@@ -1,16 +1,17 @@
 import asyncio
 from pathlib import Path
-from textwrap import dedent
 
 from loguru import logger
-import tomli as tomllib
 from pyrogram import filters
 from pyrogram.handlers import MessageHandler
 from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
 from pyrogram.enums import ParseMode
 
 from embykeeper.utils import AsyncTyper
-from embykeeper.telechecker.tele import Client, API_KEY
+from embykeeper.telegram.pyrogram import Client
+from embykeeper.telegram.session import API_ID, API_HASH
+from embykeeper.config import config
+from embykeeper import var
 
 app = AsyncTyper()
 
@@ -72,25 +73,22 @@ async def start(client: Client, message: Message):
 
 
 @app.async_command()
-async def main(config: Path):
-    with open(config, "rb") as f:
-        config = tomllib.load(f)
-    for k in API_KEY.values():
-        api_id = k["api_id"]
-        api_hash = k["api_hash"]
+async def main(config_file: Path):
+    var.debug = 2
+    await config.reload_conf(config_file)
     bot = Client(
         name="test_bot",
-        bot_token=config["bot"]["token"],
-        proxy=config.get("proxy", None),
+        bot_token=config.bot.token,
+        proxy=config.proxy.model_dump(),
         workdir=Path(__file__).parent,
-        api_id=api_id,
-        api_hash=api_hash,
+        api_id=API_ID,
+        api_hash=API_HASH,
         in_memory=True,
     )
     async with bot:
         await bot.add_handler(MessageHandler(start, filters.command("start")))
         logger.info(f"Started listening for commands: @{bot.me.username}.")
-        await asyncio.Event().wait()
+        await asyncio.Future()
 
 
 if __name__ == "__main__":

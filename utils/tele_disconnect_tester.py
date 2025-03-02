@@ -1,27 +1,28 @@
 import asyncio
 from pathlib import Path
 
-from embykeeper.telechecker.tele import ClientsSession
+from embykeeper.telegram.session import ClientsSession
 from embykeeper.utils import AsyncTyper
-import tomli as tomllib
+from embykeeper.config import config
 
 app = AsyncTyper()
 
 
 @app.async_command()
-async def main(config: Path):
-    with open(config, "rb") as f:
-        config = tomllib.load(f)
+async def main(config_file: Path):
+    await config.reload_conf(config_file)
     print("Send 1")
-    async with ClientsSession.from_config(config) as clients:
-        async for client in clients:
-            await client.send_message("me", "Test")
+    async with ClientsSession(config.telegram.account[:1]) as clients:
+        async for _, tg in clients:
+            await tg.send_message("me", "Test")
             break
+
     print("Wait for 300 seconds")
     await asyncio.sleep(300)
-    async with ClientsSession.from_config(config) as clients:
-        async for client in clients:
-            await client.send_message("me", "Test")
+
+    async with ClientsSession(config.telegram.account[:1]) as clients:
+        async for _, tg in clients:
+            await tg.send_message("me", "Test")
             break
     print("Send 2")
 

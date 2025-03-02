@@ -10,7 +10,9 @@ from pyrogram.types import Message
 from pyrogram.enums import ParseMode
 
 from embykeeper.utils import AsyncTyper
-from embykeeper.telechecker.tele import Client, API_KEY
+from embykeeper.telegram.pyrogram import Client
+from embykeeper.config import config
+from embykeeper.telegram.session import API_ID, API_HASH
 
 app = AsyncTyper()
 app_config = {}
@@ -31,20 +33,16 @@ async def checkin(client: Client, message: Message):
 
 
 @app.async_command()
-async def main(config: Path, url: str):
-    with open(config, "rb") as f:
-        app_config.update(tomllib.load(f))
+async def main(config_file: Path, url: str):
+    await config.reload_conf(config_file)
     app_config["url"] = url
-    for k in API_KEY.values():
-        api_id = k["api_id"]
-        api_hash = k["api_hash"]
     bot = Client(
         name="test_bot",
-        bot_token=app_config["bot"]["token"],
-        proxy=app_config.get("proxy", None),
+        bot_token=config.bot.token,
+        proxy=config.proxy.model_dump(),
         workdir=Path(__file__).parent,
-        api_id=api_id,
-        api_hash=api_hash,
+        api_id=API_ID,
+        api_hash=API_HASH,
         in_memory=True,
     )
     async with bot:

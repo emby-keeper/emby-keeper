@@ -2,83 +2,213 @@
 # 所有账户信息为生成, 请填写您的账户信息.
 # 查看帮助与详情: https://emby-keeper.github.io#安装与使用
 
-# 每天进行 Telegram Bot 签到的时间范围, 等同于命令行 "-c" 参数.
-time = "<8:00AM,10:00AM>"
+# ================================================================================
+# Emby 保活相关设置
+# 详见: https://emby-keeper.github.io/guide/配置文件#emby-子项
+# ================================================================================
 
-# 每隔几天进行 Emby 保活, 或随机范围, 等同于命令行 "-e" 参数.
-interval = "<3,12>"
+[emby]
 
-# Emby 保活开始时间的时间范围.
-watchtime = "<11:00AM,11:00PM>"
+# 每次进行进行 Emby 保活的当日时间范围, 可以为单个时间 ("8:00AM") 或时间范围 ("<8:00AM,10:00AM>"):
+time_range = "<11:00AM,11:00PM>"
 
-# 将关键信息发送到第一个 Telegram 账号, 设为 N 以发送到第 N 个.
-notifier = true
+# 每隔几天进行 Emby 保活:
+interval_days = "<7,12>"
 
-# 每个 Telegram Bot 签到的最大尝试时间 (秒).
-timeout = 240
+# 最大可同时进行的站点数:
+concurrency = 1
 
-# 每个 Telegram Bot 签到的最大尝试次数.
-retries = 4
+# ================================================================================
+# Emby 账号, 您可以重复该片段多次以增加多个账号.
+# 详见: https://emby-keeper.github.io/guide/配置文件#emby-account-子项
+# ================================================================================
 
-# 最大可同时进行的 Telegram Bot 签到.
-concurrent = 1
+[[emby.account]] # 第 1 个账号
 
-# 最大可同时进行的 Emby 站点保活.
-watch_concurrent = 3
+# 站点域名和端口:
+url = "https://lucas.com:443"
 
-# 计划任务时, 各站点之间签到的随机时间差异 (分钟), 所有站点签到将在该时间范围内完成.
+# 用户名和密码:
+username = "derrickchristian"
+password = "+0X%H*Dh83"
+
+# 模拟观看的随机时长范围 (秒), 可以为单个数字 (120) 或时间范围 ([120, 240]):
+time = [300, 600]
+
+# 以下为进阶配置, 请取消注释 (删除左侧的 #) 以使用:
+
+# 该服务器是否为 Jellyfin 服务器:
+# jellyfin = true
+
+# 每隔几天进行保活, 默认使用全局设置 emby.interval_days:
+# interval_days = "<7,12>"
+
+# 每次进行保活的当日时间范围, 默认使用全局设置 emby.time_range:
+# time_range = "<11:00AM,11:00PM>"
+
+# 使用连续播放, 主要用于增加观看时长:
+# continuous = true
+
+# 无法获取视频长度时, 依然允许播放 (默认最大播放 10 分钟左右, 可能播放超出实际长度):
+# allow_stream = true
+
+# 取消注释以不使用配置文件定义的代理进行连接
+# use_proxy = false
+
+# 取消注释以禁用该账户
+# enabled = false
+
+[[emby.account]] # 第 2 个账号
+url = "https://mills.com:443"
+username = "lynn43"
+password = "KgF#cFXN^2"
+time = [300, 600]
+
+# ================================================================================
+# Telegram 机器人签到相关设置
+# 详见: https://emby-keeper.github.io/guide/配置文件#checkiner-子项
+# ================================================================================
+
+[checkiner]
+
+# 每次进行进行 Telegram 签到的当日时间范围, 可以为单个时间 ("8:00AM") 或时间范围 ("<8:00AM,10:00AM>"):
+time_range = "<11:00AM,11:00PM>"
+
+# :
 random = 60
 
-# 代理设置, Emby 和 Telegram 均将通过此代理连接, 服务器位于国内时请配置代理并取消注释.
+# 每个站点签到的最大超时时间:
+timeout = 120
+
+# 各站点最大可重试次数 (部分站点出于安全考虑有独立的设置):
+retries = 4
+
+# 最大可同时进行的站点数:
+concurrency = 1
+
+# ================================================================================
+# Telegram 账号, 您可以重复该片段多次以增加多个账号.
+# 详见: https://emby-keeper.github.io/guide/配置文件#telegram-account-子项
+# ================================================================================
+
+[[telegram.account]] # 第 1 个账号
+
+# 带国家区号的账户手机号, 一般为 "+86..."
+phone = "+8617273018546"
+
+# 启用机器人签到系列功能, 默认启用, 设置为 false 以禁用:
+checkiner = true
+
+# 启用群组监控系列功能, 包括抢邀请码和回答问题等, 默认禁用, 设置为 true 以启用:
+monitor = false
+
+# 启用自动水群系列功能, 风险较高, 默认禁用, 设置为 true 以启用:
+messager = false
+
+[[telegram.account]] # 第 2 个账号
+phone = "+8616987483316"
+checkiner = true
+monitor = false
+messager = false
+
+# ================================================================================
+# 站点相关设置
+# 当您需要禁用某些站点时, 请将该段取消注释并修改.
+# 该部分内容是根据 Embykeeper 7.0.14 生成的.
+# 详见: https://emby-keeper.github.io/guide/配置文件#site-子项
+# ================================================================================
+
+# 使用 "all" 代表所有签到器, "sgk" 以代表所有社工库签到器.
+
+# 案例 (启用所有站点, 除了社工库站点):
+# [site]
+# checkiner = ["all", "-sgk"]
+
+# 案例 (启用默认站点, 额外增加 temby 站点):
+# [site]
+# checkiner = ["+temby"]
+
+# 可以分别设置各个组件 (机器人签到 / 群组监控 / 自动水群) 的站点:
+# [site]
+# checkiner = ["-terminus", "-temby"]
+# monitor = ["-misty"]
+# messager = ["pornemby"]
+
+# 默认启用站点:
+# [site]
+# checkiner = ["apoppro", "aurora", "awatv", "cc", "datasgk", "dvfilm", "epub", "feiyue", "feiyuedpx", "future", "ikunmusic", "jingzhe", "jsq", "july", "levilde", "lily", "lyrebird", "magic", "micu", "misty", "mjj", "mooncake", "moonkk", "moyunge", "nebula", "nebula_old", "pandatv", "pandatv_group", "peach", "pilipili", "plumber", "pornemby", "raismusic", "saturday", "sfcju", "shufu", "tanhua", "tdck", "tdck_new", "terminus", "tiannan", "tiannanus", "watermelon", "worldline", "yomo", "zm"]
+# monitor = ["bgk", "future", "infinity_fly", "misty", "pornemby_answer", "pornemby_double", "pornemby_dragon_rain", "pornemby_exam", "pornemby_nohp", "viper"]
+# messager = []
+
+# 全部可用站点:
+# [site]
+# checkiner = ["agentsgk", "aisgk", "aivbi", "akile", "akile_group", "akuai", "alpha", "apop", "apoppro", "aurora", "awamusic", "awatv", "baidusgk", "bearsgk", "bingdaosgk", "bitsgk", "bluesea", "bostsgk", "bytevirt_group", "carll1sgk", "carll2sgk", "cc", "charon", "charon_old", "chunjiangsgk", "ciji", "datasgk", "dingdangsgk", "dogsgk", "dvfilm", "embyhub", "epub", "fanhuasgk", "feiji", "feiyue", "feiyuedpx", "feiyuemusic", "feiyuemusic_group_old", "future", "happy", "heisi", "hka", "huasgk", "ikunmusic", "infsgk", "ingeeksgk", "jinding", "jingzhe", "jms", "jms_iptv", "jms_old", "johnsgk", "jsq", "judog", "july", "koisgk", "levilde", "lily", "ljyy", "ljyy_old", "lyrebird", "m78", "magic", "marmot_group_old", "mastersgk", "micu", "minisgk", "misty", "mjj", "mooncake", "moonkk", "moshensgk", "moyunge", "navidrome", "nebula", "nebula_old", "niaoge", "oixel", "pandatv", "pandatv_group", "peach", "pilipili", "pingansgk", "plumber", "pornemby", "qingfengsgk", "raismusic", "rednosesgk", "saturday", "seedsgk", "sfcju", "shufu", "singularity", "skysink", "sssq", "starcat", "starsgk", "tanhua", "tdck", "tdck_new", "temby", "temby_beta", "temby_old", "terminus", "terminus_old", "theend", "tianmaosgk", "tiannan", "tiannanus", "unionsgk", "watermelon", "worldline", "xraysgk", "yomo", "zhihusgk", "zhipian", "zhushousgk", "zm"]
+# monitor = ["bgk", "embyhub", "follow", "future", "infinity_fly", "judog", "misty", "polo", "pornemby_alert", "pornemby_answer", "pornemby_double", "pornemby_dragon_rain", "pornemby_exam", "pornemby_nohp", "pornemby_register", "shufu", "terminus_exam", "viper"]
+# messager = ["marmot", "nakonako", "pornemby", "smart_pornemby"]
+
+# ================================================================================
+# 代理相关设置
+# 代理设置, Emby 和 Telegram 均将通过此代理连接, 服务器位于国内时请配置代理并取消注释
 # 详见: https://emby-keeper.github.io/guide/配置文件#proxy-子项
+# ================================================================================
+
 # [proxy]
 # hostname = "127.0.0.1"
 # port = 1080
 # scheme = "socks5" # 可选: http / socks5
 
-# 服务设置, 当您需要禁用某些站点时, 请将该段取消注释并修改.
-# 该部分内容是根据 Embykeeper 6.7.3 生成的.
-# 详见: https://emby-keeper.github.io/guide/配置文件#service-子项
-# 使用 checkiner = ["all"] 以启用所有签到器, 使用 checkiner = ["sgk"] 以启用所有社工库签到器.
+# ================================================================================
+# 日志推送相关设置
+# 详见: https://emby-keeper.github.io/guide/配置文件#notifier-子项
+# ================================================================================
 
-# 默认启用站点:
-# [service]
-# checkiner = ["apoppro", "aurora", "awatv", "cc", "datasgk", "dvfilm", "feiyue", "feiyuedpx", "future", "ikunmusic", "jingzhe", "jsq", "july", "levilde", "lily", "lyrebird", "magic", "micu", "misty", "mjj", "mooncake", "moonkk", "nebula", "pandatv", "pandatv_group", "peach", "pilipili", "plumber", "pornemby", "raismusic", "saturday", "sfcju", "shufu", "tanhua", "tdck", "tdck_new", "terminus", "tiannan", "tiannanus", "watermelon", "worldline", "yomo", "zm"]
-# monitor = ["bgk", "future", "infinity_fly", "misty", "pornemby_answer", "pornemby_double", "pornemby_dragon_rain", "pornemby_exam", "pornemby_nohp", "viper"]
-# messager = []
+[notifier]
 
-# 全部可用站点:
-# [service]
-# checkiner = ["agentsgk", "aisgk", "aivbi", "akile", "akile_group", "akuai", "alpha", "apop", "apoppro", "aurora", "awamusic", "awatv", "baidusgk", "bearsgk", "bingdaosgk", "bitsgk", "bluesea", "bostsgk", "bytevirt_group", "carll1sgk", "carll2sgk", "cc", "charon", "charon_old", "chunjiangsgk", "ciji", "datasgk", "dingdangsgk", "dogsgk", "dvfilm", "embyhub", "fanhuasgk", "feiji", "feiyue", "feiyuedpx", "feiyuemusic", "feiyuemusic_group_old", "future", "happy", "heisi", "hka", "huasgk", "ikunmusic", "infsgk", "ingeeksgk", "jinding", "jingzhe", "jms", "jms_iptv", "jms_old", "johnsgk", "jsq", "judog", "july", "koisgk", "levilde", "lily", "ljyy", "ljyy_old", "lyrebird", "m78", "magic", "marmot_group_old", "mastersgk", "micu", "minisgk", "misty", "mjj", "mooncake", "moonkk", "moshensgk", "navidrome", "nebula", "niaoge", "pandatv", "pandatv_group", "peach", "pilipili", "pingansgk", "plumber", "pornemby", "qingfengsgk", "raismusic", "rednosesgk", "saturday", "seedsgk", "sfcju", "shufu", "shzi", "singularity", "skysink", "sssq", "starcat", "starsgk", "tanhua", "tdck", "tdck_new", "temby", "temby_beta", "temby_old", "terminus", "terminus_old", "theend", "tianmaosgk", "tiannan", "tiannanus", "unionsgk", "watermelon", "worldline", "xraysgk", "yomo", "zhihusgk", "zhipian", "zhushousgk", "zm"]
-# monitor = ["bgk", "embyhub", "follow", "future", "infinity_fly", "judog", "misty", "polo", "pornemby_alert", "pornemby_answer", "pornemby_double", "pornemby_dragon_rain", "pornemby_exam", "pornemby_nohp", "pornemby_register", "shufu", "terminus_exam", "viper"]
-# messager = ["marmot", "nakonako", "pornemby", "smart_pornemby"]
+# 启用签到/保活结果的日志推送:
+enabled = true
+# 使用第几个 Telegram 账号进行推送, 从 1 开始计数:
+account = 1
+# 默认情况下, 日志推送将在每天指定时间统一推送 (在 @embykeeper_bot 设置), 设置为 false 以立刻推送
+immediately = false
+# 默认情况下, 启动时立刻执行的一次签到/保活不会推送消息, 设置为 true 以推送
+once = false
 
-# Telegram 账号设置, 您可以重复该片段多次以增加多个账号.
-# 详见: https://emby-keeper.github.io/guide/配置文件#telegram-子项
+# ================================================================================
+# Subsonic 保活相关设置 (包括 Navidrome 和其他支持 Subsonic API 的音乐服站点)
+# 详见: https://emby-keeper.github.io/guide/配置文件#subsonic-子项
+# ================================================================================
 
-[[telegram]]
-phone = "+8614257173057"
-checkin = true
-send = false # 启用该账号的自动水群功能 (需要高级账号, 谨慎使用)
-monitor = false # 启用该账号的自动监控功能 (需要高级账号)
+[subsonic]
 
-[[telegram]]
-phone = "+8613468630521"
-checkin = true
-send = false # 启用该账号的自动水群功能 (需要高级账号, 谨慎使用)
-monitor = false # 启用该账号的自动监控功能 (需要高级账号)
+# 每次进行进行 Subsonic 保活的当日时间范围, 可以为单个时间 ("8:00AM") 或时间范围 ("<8:00AM,10:00AM>"):
+time_range = "<11:00AM,11:00PM>"
 
-# Emby 账号设置, 您可以重复该片段多次以增加多个账号.
-# 详见: https://emby-keeper.github.io/guide/配置文件#emby-子项
+# 每隔几天进行 Subsonic 保活:
+interval_days = "<7,12>"
 
-[[emby]]
-url = "https://www.cunningham.com/"
-username = "jonathanbarr"
-password = ")xQIH_Q$^9"
-time = [120, 240] # 模拟观看的时长范围 (秒)
+# 最大可同时进行的站点数:
+concurrency = 1
 
-[[emby]]
-url = "https://www.walton.net/"
-username = "richardnewman"
-password = "%D3y1xFcTw"
-time = [120, 240] # 模拟观看的时长范围 (秒)
+# ================================================================================
+# Subsonic 账号, 您可以重复该片段多次以增加多个账号.
+# 详见: https://emby-keeper.github.io/guide/配置文件#subsonic-account-子项
+# ================================================================================
+
+[[subsonic.account]] # 第 1 个账号
+
+# 站点域名和端口:
+url = "https://www.obrien.info:443"
+
+# 用户名和密码:
+username = "morganlance"
+password = "@c!P8I5hW#"
+
+# 模拟观看的随机时长范围 (秒), 可以为单个数字 (120) 或时间范围 ([120, 240]):
+time = [300, 600]
+
+[[subsonic.account]] # 第 2 个账号
+url = "https://www.wade.com:443"
+username = "klinecameron"
+password = "O3Ccz!ag^3"
+time = [300, 600]
+

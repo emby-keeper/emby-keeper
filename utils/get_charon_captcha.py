@@ -1,10 +1,11 @@
 import asyncio
 from pathlib import Path
 from tqdm import tqdm, trange
-import tomli as tomllib
 
-from embykeeper.telechecker.tele import ClientsSession
+from embykeeper.telegram.session import ClientsSession
 from embykeeper.utils import AsyncTyper, async_partial
+from embykeeper.config import config
+from embykeeper import __name__ as __product__
 
 app = AsyncTyper()
 
@@ -13,12 +14,10 @@ chat = "api_group"
 
 
 @app.async_command()
-async def generate(config: Path, num: int = 200, output: Path = "captchas.txt"):
-    with open(config, "rb") as f:
-        config = tomllib.load(f)
-    proxy = config.get("proxy", None)
-    async with ClientsSession(config["telegram"][:1], proxy=proxy) as clients:
-        async for tg in clients:
+async def generate(config_file: Path, num: int = 200, output: Path = "captchas.txt"):
+    await config.reload_conf(config_file)
+    async with ClientsSession(config.telegram.account[:1]) as clients:
+        async for _, tg in clients:
             wr = async_partial(tg.wait_reply, bot, timeout=None)
             photos = []
             try:
@@ -36,15 +35,13 @@ async def generate(config: Path, num: int = 200, output: Path = "captchas.txt"):
 
 
 @app.async_command()
-async def label(config: Path, inp: Path = "captchas.txt"):
+async def label(config_file: Path, inp: Path = "captchas.txt"):
+    await config.reload_conf(config_file)
     with open(inp) as f:
         photos = [l.strip() for l in f.readlines()]
-    with open(config, "rb") as f:
-        config = tomllib.load(f)
-    proxy = config.get("proxy", None)
     tasks = []
-    async with ClientsSession(config["telegram"][:1], proxy=proxy) as clients:
-        async for tg in clients:
+    async with ClientsSession(config.telegram.account[:1]) as clients:
+        async for _, tg in clients:
             for photo in tqdm(photos, desc="标记验证码"):
                 async with tg.catch_reply(chat) as f:
                     await tg.send_photo(chat, photo)

@@ -1,5 +1,4 @@
 import asyncio
-from collections import namedtuple
 from contextlib import asynccontextmanager
 from datetime import date, datetime, time, timedelta
 from functools import wraps
@@ -10,21 +9,27 @@ import site
 import traceback
 from typing import Any, Coroutine, Iterable, Optional, Union
 
-import click
 from loguru import logger
-from typer import Typer
-from typer.core import TyperCommand
+from typer import Typer, Exit
 
 from . import var, __url__, __name__, __version__
-
-Flagged = namedtuple("Flagged", ("noflag", "flag"))
+from .schema import ProxyConfig
 
 
 def get_path_frame(e, path):
+    """获取指定路径下的最后一个错误栈帧.
+
+    Args:
+        e: 异常对象
+        path: 要搜索的路径
+
+    Returns:
+        FrameSummary: 找到的栈帧, 如果未找到则返回 None
+    """
     try:
         tb = traceback.extract_tb(e.__traceback__)
         for frame in reversed(tb):
-            if Path(path) in Path(frame.filename).parents and frame.name != "invoke":
+            if Path(path) in Path(frame.filename).parents and frame.name not in ("invoke", "__getattr__"):
                 return frame
         else:
             return None
@@ -33,6 +38,14 @@ def get_path_frame(e, path):
 
 
 def get_last_frame(e):
+    """获取异常的最后一个栈帧.
+
+    Args:
+        e: 异常对象
+
+    Returns:
+        FrameSummary: 最后一个栈帧, 如果未找到则返回 None
+    """
     try:
         tb = traceback.extract_tb(e.__traceback__)
         for frame in reversed(tb):
@@ -42,6 +55,14 @@ def get_last_frame(e):
 
 
 def get_cls_fullpath(c):
+    """获取类的完整路径名称.
+
+    Args:
+        c: 类对象
+
+    Returns:
+        str: 类的完整路径名称, 包含模块名
+    """
     module = c.__module__
     if module == "builtins":
         return c.__qualname__
@@ -49,6 +70,15 @@ def get_cls_fullpath(c):
 
 
 def format_exception(e, regular=True):
+    """格式化异常信息为可读字符串.
+
+    Args:
+        e: 异常对象
+        regular: 是否为常规异常 (如网络错误等), 影响不同日志等级下提示信息的格式
+
+    Returns:
+        str: 格式化后的异常信息
+    """
     if not regular:
         prompt = f"\n请在 Github 或交流群反馈下方错误详情以帮助开发者修复该问题 (当前版本: {__version__}):\n"
     else:
@@ -73,6 +103,12 @@ def format_exception(e, regular=True):
 
 
 def show_exception(e, regular=True):
+    """显示异常信息.
+
+    Args:
+        e: 异常对象
+        regular: 是否为常规异常 (如网络错误等), 影响不同日志等级下提示信息的格式
+    """
     if (regular and var.debug <= 1) or (not regular and var.debug == 0):
         var.console.rule()
         print(format_exception(e, regular=regular), flush=True, file=sys.stderr)
@@ -88,59 +124,38 @@ class AsyncTyper(Typer):
         def decorator(async_func):
             @wraps(async_func)
             def sync_func(*_args, **_kwargs):
+                async def main():
+                    try:
+                        await async_func(*_args, **_kwargs)
+                    except Exception as e:
+                        print("\r", end="", flush=True)
+                        logger.critical(f"发生关键错误, {__name__.capitalize()} 将退出.")
+                        show_exception(e, regular=False)
+                        sys.exit(1)
+                    else:
+                        logger.info(f"所有任务已完成, 欢迎您再次使用 {__name__.capitalize()}.")
+
                 try:
-                    asyncio.run(async_func(*_args, **_kwargs))
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    loop.run_until_complete(main())
                 except KeyboardInterrupt:
+                    print("\r正在停止...\r", end="", flush=True, file=sys.stderr)
+                except Exit as e:
+                    sys.exit(e.exit_code)
+                finally:
+                    tasks = asyncio.all_tasks(loop)
+                    for task in tasks:
+                        task.cancel()
+                    loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
+                    loop.run_until_complete(loop.shutdown_asyncgens())
                     print("\r", end="", flush=True)
-                    logger.info(f"所有客户端已停止, 欢迎您再次使用 {__name__.capitalize()}.")
-                except Exception as e:
-                    print("\r", end="", flush=True)
-                    logger.critical(f"发生关键错误, {__name__.capitalize()} 将退出.")
-                    show_exception(e, regular=False)
-                    sys.exit(1)
-                else:
-                    logger.info(f"所有任务已完成, 欢迎您再次使用 {__name__.capitalize()}.")
+                    logger.info(f"所有服务已停止并登出, 欢迎您再次使用 {__name__.capitalize()}.")
 
             self.command(*args, **kwargs)(sync_func)
             return async_func
 
         return decorator
-
-
-class FlagValueCommand(TyperCommand):
-    """允许在命令行参数中使用"="."""
-
-    def parse_args(self, ctx, args):
-        long = {}
-        short = {}
-        defined = set()
-        for o in self.params:
-            if isinstance(o, click.Option):
-                if isinstance(o.default, Flagged):
-                    for pre in o.opts:
-                        if pre.startswith("--"):
-                            long[pre] = o
-                        elif pre.startswith("-"):
-                            short[pre] = o
-
-        for i, a in enumerate(args):
-            a = a.split("=")
-            if a[0] in long:
-                defined.add(long[a[0]])
-                if len(a) == 1:
-                    args[i] = f"{a[0]}={long[a[0]].default.flag}"
-            elif a[0] in short:
-                defined.add(short[a[0]])
-                if len(args) == i + 1 or args[i + 1].startswith("-"):
-                    args.insert(i + 1, str(short[a[0]].default.flag))
-
-        for u in set(long.values()) - defined:
-            for p, o in long.items():
-                if o == u:
-                    break
-            args.append(f"{p}={u.default.noflag}")
-
-        return super().parse_args(ctx, args)
 
 
 class AsyncTaskPool:
@@ -150,7 +165,7 @@ class AsyncTaskPool:
         self.waiter = asyncio.Condition()
         self.tasks = []
 
-    def add(self, coro: Coroutine):
+    def add(self, coro: Coroutine, name: str = None):
         async def wrapper():
             task = asyncio.ensure_future(coro)
             await asyncio.wait([task])
@@ -159,7 +174,7 @@ class AsyncTaskPool:
                 return await task
 
         t = asyncio.create_task(wrapper())
-        t.set_name(coro.__name__)
+        t.set_name(name or coro.__name__)
         self.tasks.append(t)
         return t
 
@@ -184,9 +199,9 @@ class AsyncTaskPool:
 
 
 class AsyncCountPool(dict):
-    """
-    一个异步安全的 ID 分配器.
-    参数:
+    """一个异步安全的 ID 分配器.
+
+    Args:
         base: ID 起始数
     """
 
@@ -207,7 +222,8 @@ class AsyncCountPool(dict):
 def to_iterable(var: Union[Iterable, Any]):
     """
     将任何变量变为可迭代变量.
-    说明:
+
+    Note:
         None 将变为空数组.
         非可迭代变量将变为仅有该元素的长度为 1 的数组.
         可迭代变量将保持不变.
@@ -261,7 +277,7 @@ def async_partial(f, *args1, **kw1):
 
 async def idle():
     """异步无限等待函数."""
-    await asyncio.Event().wait()
+    await asyncio.Future()
 
 
 def random_time(start_time: time = None, end_time: time = None):
@@ -279,7 +295,10 @@ def random_time(start_time: time = None, end_time: time = None):
 def next_random_datetime(start_time: time = None, end_time: time = None, interval_days: int = 1):
     """在特定的开始和结束时间之间生成时间, 并设定最小间隔天数."""
     min_date = (datetime.now() + timedelta(days=interval_days)).date()
-    min_datetime = datetime.combine(min_date, time(0, 0))
+    if interval_days == 0:
+        min_datetime = datetime.now()
+    else:
+        min_datetime = datetime.combine(min_date, time(0, 0))
     target_time = random_time(start_time, end_time)
     offset_date = 0
     while True:
@@ -291,7 +310,7 @@ def next_random_datetime(start_time: time = None, end_time: time = None, interva
     return t
 
 
-def format_timedelta_human(delta):
+def format_timedelta_human(delta: timedelta):
     """将时间差转换为人类可读形式."""
     d = delta.days
     h, s = divmod(delta.seconds, 3600)
@@ -349,6 +368,7 @@ async def nonblocking(lock: asyncio.Lock):
 
 @asynccontextmanager
 async def optional(lock: Optional[asyncio.Lock]):
+    """可选的异步锁, 锁为 None 就直接运行该部分."""
     if lock is None:
         yield
     else:
@@ -398,12 +418,201 @@ def distribute_numbers(min_value, max_value, num_elements=1, min_distance=0, max
     return sorted(results)
 
 
-def get_proxy_str(proxy_dict: dict = None):
-    if proxy_dict:
-        proxy = f"{proxy_dict['scheme']}://"
-        if proxy_dict.get("username", None):
-            proxy += f"{proxy_dict['username']}:{proxy_dict['password']}@"
-        proxy += f"{proxy_dict['hostname']}:{proxy_dict['port']}"
+def get_proxy_str(proxy: Optional[ProxyConfig] = None):
+    """将代理设置转为 URL 形式."""
+    if proxy:
+        proxy_str = f"{proxy.scheme}://"
+        if proxy.username:
+            proxy_str += f"{proxy.username or ''}:{proxy.password or ''}@"
+        proxy_str += f"{proxy.hostname}:{proxy.port}"
     else:
-        proxy = None
-    return proxy
+        proxy_str = None
+    return proxy_str
+
+
+def deep_update(base_dict, update_dict):
+    """递归地更新字典"""
+    for key, value in update_dict.items():
+        if isinstance(value, dict) and key in base_dict and isinstance(base_dict[key], dict):
+            deep_update(base_dict[key], value)
+        else:
+            base_dict[key] = value
+    return base_dict
+
+
+class ProxyBase:
+    """
+    A proxy class that make accesses just like direct access to __subject__ if not overwriten in the class.
+    Attributes defined in class. attrs named in __noproxy__ will not be proxied to __subject__.
+    """
+
+    __slots__ = ()
+
+    def __call__(self, *args, **kw):
+        return self.__subject__(*args, **kw)
+
+    def hasattr(self, attr):
+        try:
+            object.__getattribute__(self, attr)
+            return True
+        except AttributeError:
+            return False
+
+    def __getattribute__(self, attr, oga=object.__getattribute__):
+        if attr.startswith("__") and attr not in oga(self, "_noproxy"):
+            subject = oga(self, "__subject__")
+            if attr == "__subject__":
+                return subject
+            return getattr(subject, attr)
+        return oga(self, attr)
+
+    def __getattr__(self, attr, oga=object.__getattribute__):
+        if attr == "hasattr" or self.hasattr(attr):
+            return oga(self, attr)
+        else:
+            return getattr(oga(self, "__subject__"), attr)
+
+    @property
+    def _noproxy(self, oga=object.__getattribute__):
+        import inspect
+
+        base = oga(self, "__class__")
+        for cls in inspect.getmro(base):
+            if hasattr(cls, "__noproxy__"):
+                yield from cls.__noproxy__
+
+    def __setattr__(self, attr, val, osa=object.__setattr__):
+        if attr == "__subject__" or attr in self._noproxy:
+            return osa(self, attr, val)
+        return setattr(self.__subject__, attr, val)
+
+    def __delattr__(self, attr, oda=object.__delattr__):
+        if attr == "__subject__" or hasattr(type(self), attr) and not attr.startswith("__"):
+            oda(self, attr)
+        else:
+            delattr(self.__subject__, attr)
+
+    def __bool__(self):
+        return bool(self.__subject__)
+
+    def __getitem__(self, arg):
+        return self.__subject__[arg]
+
+    def __setitem__(self, arg, val):
+        self.__subject__[arg] = val
+
+    def __delitem__(self, arg):
+        del self.__subject__[arg]
+
+    def __getslice__(self, i, j):
+        return self.__subject__[i:j]
+
+    def __setslice__(self, i, j, val):
+        self.__subject__[i:j] = val
+
+    def __delslice__(self, i, j):
+        del self.__subject__[i:j]
+
+    def __contains__(self, ob):
+        return ob in self.__subject__
+
+    for name in "repr str hash len abs complex int long float iter".split():
+        exec("def __%s__(self): return %s(self.__subject__)" % (name, name))
+
+    for name in "cmp", "coerce", "divmod":
+        exec("def __%s__(self, ob): return %s(self.__subject__, ob)" % (name, name))
+
+    for name, op in [
+        ("lt", "<"),
+        ("gt", ">"),
+        ("le", "<="),
+        ("ge", ">="),
+        ("eq", " == "),
+        ("ne", "!="),
+    ]:
+        exec("def __%s__(self, ob): return self.__subject__ %s ob" % (name, op))
+
+    for name, op in [("neg", "-"), ("pos", "+"), ("invert", "~")]:
+        exec("def __%s__(self): return %s self.__subject__" % (name, op))
+
+    for name, op in [
+        ("or", "|"),
+        ("and", "&"),
+        ("xor", "^"),
+        ("lshift", "<<"),
+        ("rshift", ">>"),
+        ("add", "+"),
+        ("sub", "-"),
+        ("mul", "*"),
+        ("div", "/"),
+        ("mod", "%"),
+        ("truediv", "/"),
+        ("floordiv", "//"),
+    ]:
+        exec(
+            (
+                "def __%(name)s__(self, ob):\n"
+                "    return self.__subject__ %(op)s ob\n"
+                "\n"
+                "def __r%(name)s__(self, ob):\n"
+                "    return ob %(op)s self.__subject__\n"
+                "\n"
+                "def __i%(name)s__(self, ob):\n"
+                "    self.__subject__ %(op)s=ob\n"
+                "    return self\n"
+            )
+            % locals()
+        )
+
+    del name, op
+
+    def __index__(self):
+        return self.__subject__.__index__()
+
+    def __rdivmod__(self, ob):
+        return divmod(ob, self.__subject__)
+
+    def __pow__(self, *args):
+        return pow(self.__subject__, *args)
+
+    def __ipow__(self, ob):
+        self.__subject__ **= ob
+        return self
+
+    def __rpow__(self, ob):
+        return pow(ob, self.__subject__)
+
+
+class Proxy(ProxyBase):
+    def __init__(self, val):
+        self.set(val)
+
+    def set(self, val):
+        self.__subject__ = val
+
+
+class FuncProxy(ProxyBase):
+    __noproxy__ = ("_func", "_args", "_kw")
+
+    def __init__(self, func, *args, **kw):
+        self._func = func
+        self._args = args
+        self._kw = kw
+
+    @property
+    def __subject__(self):
+        return self._func(*self._args, **self._kw)
+
+
+class CachedFuncProxy(FuncProxy):
+    __noproxy__ = ("_cached_value",)
+
+    def __init__(self, func, *args, **kw):
+        super().__init__(func, *args, **kw)
+        self._cached_value = None
+
+    @property
+    def __subject__(self):
+        if self._cached_value is None:
+            self._cached_value = self._func(*self._args, **self._kw)
+        return self._cached_value

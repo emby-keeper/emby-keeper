@@ -12,9 +12,10 @@ import openai
 from pyrogram.types import Message
 
 from embykeeper import __name__ as __product__
-from embykeeper.telechecker.messager.smart_pornemby import SmartPornembyMessager
-from embykeeper.telechecker.tele import ClientsSession
+from embykeeper.telegram.messager.smart_pornemby import SmartPornembyMessager
+from embykeeper.telegram.session import ClientsSession
 from embykeeper.utils import AsyncTyper, get_proxy_str, truncate_str
+from embykeeper.config import config
 
 
 app = AsyncTyper()
@@ -25,17 +26,15 @@ SKIP = 5
 
 
 @app.async_command()
-async def main(config: Path):
-    with open(config, "rb") as f:
-        config = tomllib.load(f)
-    proxy_dict = config.get("proxy", None)
-    proxy = get_proxy_str(proxy_dict)
+async def main(config_file: Path):
+    await config.reload_conf(config_file)
+    proxy = get_proxy_str(config.proxy)
     aiclient = openai.AsyncOpenAI(
-        api_key=config["openai"]["api_key"],
-        base_url=config["openai"]["base_url"],
+        api_key=config.openai.api_key,
+        base_url=config.openai.base_url,
         http_client=httpx.AsyncClient(proxy=proxy),
     )
-    async with ClientsSession(config["telegram"][:1], proxy=proxy_dict) as clients:
+    async with ClientsSession(config.telegram.account[:1]) as clients:
         async for tg in clients:
             messager = SmartPornembyMessager(
                 {}, config={}, me=tg.me, basedir=Path(user_data_dir(__product__))
