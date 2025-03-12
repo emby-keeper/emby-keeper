@@ -60,6 +60,7 @@ def get_cls(type: str, names: List[str] = None) -> List[Type]:
 
     exclude_names = set(name[1:] for name in names if name.startswith("-"))
     include_names = set(name[1:] for name in names if name.startswith("+"))
+    templ_names = set(name[0:] for name in names if name.startswith("templ_"))
     names = set(name for name in names if not name.startswith("-") and not name.startswith("+"))
 
     if not names and (exclude_names or include_names):
@@ -67,6 +68,7 @@ def get_cls(type: str, names: List[str] = None) -> List[Type]:
 
     if "all" in names:
         names = set(get_names(type, allow_ignore=True))
+        names = names | templ_names
 
     if type == "checkiner":
         if "sgk" in names:
