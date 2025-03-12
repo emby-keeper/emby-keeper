@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-prefix="{{ prefix }}">
   <head>
     <meta charset="utf-8" />
     <meta name="robots" content="noindex, nofollow" />
@@ -18,15 +18,15 @@
       rel="icon"
       type="image/svg+xml"
       sizes="160x160"
-      href="assets/img/illustrations/logo-only.svg"
+      href="{{ prefix }}/assets/img/illustrations/logo-only.svg"
     />
-    <link rel="stylesheet" href="assets/bootstrap/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="{{ prefix }}/assets/bootstrap/css/bootstrap.min.css" />
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css?family=Raleway:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800&amp;display=swap"
     />
-    <link rel="stylesheet" href="assets/css/icons.css" />
-    <link rel="stylesheet" href="assets/css/styles.css" />
+    <link rel="stylesheet" href="{{ prefix }}/assets/css/icons.css" />
+    <link rel="stylesheet" href="{{ prefix }}/assets/css/styles.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" />
   </head>
 
@@ -36,7 +36,7 @@
       id="mainNav"
     >
       <div class="container">
-        <a class="navbar-brand d-flex align-items-center" href="/">
+        <a class="navbar-brand d-flex align-items-center" href="{{ prefix }}/">
           <span>
             Embykeeper
             <sup>{{ version }}</sup>
@@ -52,7 +52,7 @@
         </button>
         <div class="collapse navbar-collapse" id="navcol-1">
           <ul class="navbar-nav mx-auto"></ul>
-          <a class="btn btn-primary shadow" role="button" href="/config">
+          <a class="btn btn-primary shadow" role="button" href="{{ prefix }}/config">
             配置文件
           </a>
         </div>

@@ -2,13 +2,10 @@ import asyncio
 import base64
 import binascii
 import pickle
-import random
 import struct
-import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from sqlite3 import OperationalError
 from typing import List
 
 import httpx
@@ -46,29 +43,26 @@ class ClientsSession:
     @classmethod
     async def watchdog(cls, timeout=120):
         logger.debug("Telegram 账号池看门狗启动.")
-        try:
-            counter = {}
-            while True:
-                await asyncio.sleep(10)
-                for p in list(cls.pool):
-                    try:
-                        if cls.pool[p][1] <= 0:
-                            if p in counter:
-                                counter[p] += 1
-                                if counter[p] >= timeout / 10:
-                                    counter[p] = 0
-                                    await cls.clean(p)
-                            else:
-                                counter[p] = 1
+        counter = {}
+        while True:
+            await asyncio.sleep(10)
+            for p in list(cls.pool):
+                try:
+                    if cls.pool[p][1] <= 0:
+                        if p in counter:
+                            counter[p] += 1
+                            if counter[p] >= timeout / 10:
+                                counter[p] = 0
+                                await cls.clean(p)
                         else:
-                            counter.pop(p, None)
-                    except (TypeError, KeyError):
-                        pass
-        except asyncio.CancelledError:
-            await cls.shutdown()
+                            counter[p] = 1
+                    else:
+                        counter.pop(p, None)
+                except (TypeError, KeyError):
+                    pass
 
     @classmethod
-    async def clean(cls, phone: str):
+    async def clean(cls, phone: str, force: bool = False):
         async with cls.lock:
             entry = cls.pool.get(phone, None)
             if not entry:
@@ -78,36 +72,37 @@ class ClientsSession:
                 client, ref = entry
             except TypeError:
                 return
-            if not ref:
-                logger.debug(f'登出账号 "{client.phone_number}".')
-                await client.stop()
+            if force or (not ref):
+                logger.debug(f'正在停止账号 "{client.phone_number}" 上的监听和任务.')
                 cls.pool.pop(phone, None)
+                if client.stop_handlers:
+                    logger.debug("开始执行账号的停止处理程序.")
+                    try:
+                        await asyncio.wait_for(
+                            asyncio.gather(*[h() for h in client.stop_handlers], return_exceptions=True),
+                            timeout=3,
+                        )
+                    except asyncio.TimeoutError:
+                        logger.warning("部分账号的退出处理程序超时未完成.")
+                    else:
+                        logger.debug("账号的退出处理程序执行完成, 开始清理监听.")
+                else:
+                    logger.debug("未注册退出处理程序, 开始清理监听.")
+                await client.dispatcher.stop()
+                await client.stop()
+                logger.debug(f'已停止账号 "{client.phone_number}" 的监听和任务.')
 
     @classmethod
-    async def clean_all(cls):
+    async def clean_all(cls, force: bool = False):
         for phone in list(cls.pool):
-            await cls.clean(phone)
+            await cls.clean(phone, force=force)
 
     @classmethod
     async def shutdown(cls):
-        """停止所有 Telegram 客户端会话."""
-        # 1. 取消所有 pool 中的 task
-        for v in cls.pool.values():
-            if isinstance(v, asyncio.Task):
-                v.cancel()
+        logger.info(f"正在停止所有 Telegram 账号上的的监听和任务.")
+        await cls.clean_all(force=True)
 
-        # 2. 向所有 client 发送停止信号并登出账号
-        logger.debug(f"Telegram 账号池停止, 正在停止所有账号客户端.")
-        for v in cls.pool.values():
-            if isinstance(v, tuple):
-                client: Client = v[0]
-                try:
-                    logger.debug(f'登出账号 "{client.phone_number}".')
-                    await client.terminate()
-                except Exception as e:
-                    logger.debug(f'登出账号 "{client.phone_number}" 时发生错误: {e}')
-
-    def __init__(self, accounts: List[TelegramAccount], in_memory=False, proxy=None, basedir=None):
+    def __init__(self, accounts: List[TelegramAccount], in_memory=True, proxy=None, basedir=None):
         self.accounts = accounts
         self.phones = []
         self.done = asyncio.Queue()
@@ -118,6 +113,7 @@ class ClientsSession:
 
         if not self.watch:
             self.__class__.watch = asyncio.create_task(self.watchdog())
+            var.exit_handlers.append(self.__class__.shutdown)
 
     @property
     def basedir(self):
@@ -309,7 +305,7 @@ class ClientsSession:
                         proxy=self.proxy.model_dump() if self.proxy else None,
                         workdir=str(self.basedir),
                         sleep_threshold=30,
-                        workers=64,
+                        workers=16,
                     )
                     try:
                         await asyncio.wait_for(client.start(), 20)
@@ -326,12 +322,6 @@ class ClientsSession:
                         cache.set(session_str_key, session_str)
                         logger.debug(f'登录账号 "{client.phone_number}" 成功.')
                         return client
-                except OperationalError as e:
-                    logger.warning(f"内部数据库错误, 正在重置, 您可能需要重新登录.")
-                    show_exception(e)
-                    await client.storage.delete()
-                    cache.delete(session_str_key)
-                    continue
                 except ApiIdPublishedFlood:
                     logger.warning(f'登录账号 "{account.phone}" 时发生 API key 限制, 将被跳过.')
                     break

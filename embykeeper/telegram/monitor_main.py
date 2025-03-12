@@ -31,10 +31,12 @@ class MonitorManager:
     def _handle_account_change(self, added: List[TelegramAccount], removed: List[TelegramAccount]):
         """Handle account additions and removals"""
         for account in removed:
+            logger.info(f"{account.phone} 账号的群组监控任务已被清除.")
             self.stop_account(account.phone)
 
         for account in added:
             if account.monitor and account.enabled:
+                logger.info(f"新增的 {account.phone} 账号的群组监控任务已增加.")
                 self.start_account(account)
 
     def stop_account(self, phone: str):
@@ -100,7 +102,10 @@ class MonitorManager:
         names = []
 
         for cls in clses:
-            site_name = cls.__module__.rsplit(".", 1)[-1]
+            if hasattr(cls, "templ_name"):
+                site_name = cls.templ_name
+            else:
+                site_name = cls.__module__.rsplit(".", 1)[-1]
             site_ctx = RunContext.prepare(f"{site_name} 站点监控", parent_ids=ctx.id)
             monitor = cls(
                 client,

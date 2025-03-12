@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-prefix="{{ prefix }}">
   <head>
     <meta charset="utf-8" />
     <meta name="robots" content="noindex, nofollow" />
@@ -18,15 +18,15 @@
       rel="icon"
       type="image/svg+xml"
       sizes="160x160"
-      href="assets/img/illustrations/logo-only.svg"
+      href="{{ prefix }}/assets/img/illustrations/logo-only.svg"
     />
-    <link rel="stylesheet" href="assets/bootstrap/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="{{ prefix }}/assets/bootstrap/css/bootstrap.min.css" />
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css?family=Raleway:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800&amp;display=swap"
     />
-    <link rel="stylesheet" href="assets/css/icons.css" />
-    <link rel="stylesheet" href="assets/css/styles.css" />
+    <link rel="stylesheet" href="{{ prefix }}/assets/css/icons.css" />
+    <link rel="stylesheet" href="{{ prefix }}/assets/css/styles.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/addon/scroll/simplescrollbars.css">
     <style>
@@ -61,7 +61,7 @@
       id="mainNav"
     >
       <div class="container">
-        <a class="navbar-brand d-flex align-items-center" href="/">
+        <a class="navbar-brand d-flex align-items-center" href="{{ prefix }}/">
           <span>
             Embykeeper
             <sup>{{ version }}</sup>
@@ -77,7 +77,7 @@
         </button>
         <div class="collapse navbar-collapse" id="navcol-1">
           <ul class="navbar-nav mx-auto"></ul>
-          <a class="btn btn-primary shadow" role="button" href="/console">
+          <a class="btn btn-primary shadow" role="button" href="{{ prefix }}/console">
             控制台
           </a>
         </div>
@@ -127,7 +127,7 @@
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-              <p class="mx-3">若您设置了 Telegram 账号, 请回到<a href="/console">控制台</a>并点击右上方的重启按钮以登陆各账号.</p>
+              <p class="mx-3">若您设置了 Telegram 账号, 请回到<a href="{{ prefix }}/console">控制台</a>并点击右上方的重启按钮以登陆各账号.</p>
               <hr>
               <p class="mx-3">否则, 请将下方内容写入托管平台的 <span class="text-info cursor-pointer" id="env-name">EK_CONFIG</span> 环境变量, 否则配置将在重启后丢失.</p>
               <div id="modal-data-box" class="mx-3 my-3 p-3 cursor-pointer">

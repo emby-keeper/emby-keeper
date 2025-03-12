@@ -49,7 +49,7 @@ Embykeeper 支持 Docker 或 PyPI 安装 (Linux / Windows), 也支持云部署, 
 
 若您没有服务器, 您可以通过免费托管平台进行部署, 点击下方按钮开始部署:
 
-[![Deploy to Huggingface Space](https://github.com/emby-keeper/emby-keeper/raw/main/images/deploy-to-hf.svg)](https://huggingface.co/spaces/embykeeper/ek?duplicate=true)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[![Tutorial](https://github.com/emby-keeper/emby-keeper/raw/main/images/hf-tutorial.svg)](https://blog.zetx.tech/2024/05/19/embykeeper-hf-tutorial/)
+[![Deploy to Huggingface Space](https://github.com/emby-keeper/emby-keeper/raw/main/images/deploy-to-hf.svg)](https://huggingface.co/spaces/ekuser/prompt-generator?duplicate=true)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[![Tutorial](https://github.com/emby-keeper/emby-keeper/raw/main/images/hf-tutorial.svg)](https://blog.zetx.tech/2024/05/19/embykeeper-hf-tutorial/)
 
 若您有服务器, 我们推荐使用 [Docker 部署](https://emby-keeper.github.io/guide/Linux-Docker-部署):
 
@@ -127,6 +127,7 @@ docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper -
   - 惊蛰 (`jingzhe`): [频道](https://t.me/jz_emby) [群组](https://t.me/jingzhe_EMBY) [机器人](https://t.me/JingzheProbot)
   - 墨云阁 (`moyunge`): [频道](https://t.me/q98e1VZocwxkZDc1) [群组](https://t.me/mobaishishuaige) [机器人](https://t.me/MoYunGeBoss_bot)
   - 电子书库 (`epub`): [频道](https://t.me/bookhsulife) [群组](https://t.me/libhsulife) [机器人](https://t.me/wenjian_emby_bot)
+  - Kiku (`kiku`): [频道](https://t.me/KikuEmbyNotice) [群组](https://t.me/KikuEmbyChat) [机器人](https://t.me/kikuemby_bot)
 
   <!-- #endregion checkiner-sites -->
 

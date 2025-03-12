@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 import sqlite3
 import struct
-from typing import Union, TYPE_CHECKING
+from typing import Union
 import logging
 
 from rich.prompt import Prompt
@@ -47,9 +47,6 @@ from embykeeper import var, __name__ as __product__, __version__
 from embykeeper.utils import async_partial, show_exception
 
 var.tele_used.set()
-
-if TYPE_CHECKING:
-    from telethon import TelegramClient
 
 logger = logger.bind(scheme="telegram")
 
@@ -103,6 +100,20 @@ class Dispatcher(dispatcher.Dispatcher):
 
             if not self.client.skip_updates:
                 await self.client.recover_gaps()
+
+    async def stop(self, clear: bool = True):
+        if not self.client.no_updates:
+            for i in range(self.client.workers):
+                self.updates_queue.put_nowait(None)
+            for i in self.handler_worker_tasks:
+                i.cancel()
+                try:
+                    await i
+                except asyncio.CancelledError:
+                    pass
+            if clear:
+                self.handler_worker_tasks.clear()
+                self.groups.clear()
 
     def add_handler(self, handler, group: int):
         async def fn():
@@ -189,8 +200,6 @@ class Dispatcher(dispatcher.Dispatcher):
                     break
             except pyrogram.StopPropagation:
                 pass
-            except TimeoutError:
-                logger.info("网络不稳定, 可能遗漏消息.")
             except Exception as e:
                 logger.warning("更新控制器错误.")
                 show_exception(e, regular=False)
@@ -298,6 +307,7 @@ class Client(pyrogram.Client):
     def __init__(self, *args, **kw):
         super().__init__(*args, **kw)
         self.dispatcher = Dispatcher(self)
+        self.stop_handlers = []
         if self.in_memory:
             self.storage = MemoryStorage(self.name, self.session_string)
         else:
@@ -403,7 +413,7 @@ class Client(pyrogram.Client):
                 raise asyncio.CancelledError() from None
         else:
             raise OSError(
-                f"Fail to invoke Telegram function due to network error "
+                f"执行 Telegram 请求由于网络因素而失败, 且重试超限."
                 f"({last_error.__class__.__name__} for {query.__class__.__name__})"
             )
 

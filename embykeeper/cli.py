@@ -1,15 +1,76 @@
+import logging
 import os
 from pathlib import Path
 import sys
 from typing import List
+from functools import wraps
 
 import typer
 import asyncio
+from loguru import logger
 from appdirs import user_data_dir
 
 from . import var, __author__, __name__ as __product__, __url__, __version__
-from .utils import AsyncTyper, AsyncTaskPool, show_exception
+from .utils import AsyncTaskPool, show_exception
 from .config import config
+
+
+class AsyncTyper(typer.Typer):
+    def async_command(self, *args, **kwargs):
+        def decorator(async_func):
+            @wraps(async_func)
+            def sync_func(*_args, **_kwargs):
+                async def main():
+                    try:
+                        await async_func(*_args, **_kwargs)
+                    except typer.Exit as e:
+                        sys.exit(e.exit_code)
+                    except Exception as e:
+                        print("\r", end="", flush=True)
+                        logger.critical(f"发生关键错误, {__name__.capitalize()} 将退出.")
+                        show_exception(e, regular=False)
+                        sys.exit(1)
+                    else:
+                        logger.info(f"所有任务已完成, 欢迎您再次使用 {__name__.capitalize()}.")
+
+                try:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    loop.run_until_complete(main())
+                except KeyboardInterrupt:
+                    print("\r正在停止...\r", end="", flush=True, file=sys.stderr)
+                finally:
+                    if var.exit_handlers:
+                        logger.debug("开始执行退出处理程序.")
+                        try:
+                            # Wait for exit handlers with timeout
+                            loop.run_until_complete(
+                                asyncio.wait_for(
+                                    asyncio.gather(*[h() for h in var.exit_handlers], return_exceptions=True),
+                                    timeout=3,
+                                )
+                            )
+                        except asyncio.TimeoutError:
+                            logger.warning("部分退出处理程序超时未完成.")
+                        else:
+                            logger.debug("退出处理程序执行完成, 开始清理所有任务.")
+                    else:
+                        logger.debug("未注册退出处理程序, 开始清理所有任务.")
+
+                    # Then cancel remaining tasks
+                    tasks = asyncio.all_tasks(loop)
+                    for task in tasks:
+                        task.cancel()
+                    loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
+                    loop.run_until_complete(loop.shutdown_asyncgens())
+                    print("\r", end="", flush=True)
+                    logger.info(f"所有服务已停止并登出, 欢迎您再次使用 {__product__.capitalize()}.")
+
+            self.command(*args, **kwargs)(sync_func)
+            return async_func
+
+        return decorator
+
 
 app = AsyncTyper(
     pretty_exceptions_enable=False,
@@ -213,13 +274,29 @@ async def main(
         rich_help_panel="调试参数",
         help="设定账号文件的位置",
     ),
+    noexit: bool = typer.Option(
+        False,
+        "--noexit",
+        "-N",
+        rich_help_panel="调试参数",
+        help="要求所有长期任务在没有账号时继续监控等待",
+    ),
+    clean: bool = typer.Option(
+        False,
+        "--clean",
+        rich_help_panel="调试参数",
+        help="显示或清理 Emby 模拟设备和登陆凭据等缓存",
+    ),
 ):
-    from .log import logger, initialize
+    from .log import initialize, apply_logging_adapter
 
     var.debug = verbosity
     if verbosity >= 3:
         level = 0
+        logging.getLogger("pyrogram.session").setLevel(20)
+        logging.getLogger("hpack").setLevel(20)
         asyncio.get_event_loop().set_debug(True)
+        apply_logging_adapter(level=10)
     elif verbosity >= 1:
         level = "DEBUG"
     else:
@@ -267,6 +344,7 @@ async def main(
     if debug_cron:
         config.debug_cron = True
         logger.warning("您当前处于计划任务调试模式, 将在 10 秒后运行计划任务.")
+    config.noexit = noexit
 
     if not checkiner and not monitor and not emby and not messager and not subsonic:
         checkiner = True
@@ -282,10 +360,16 @@ async def main(
 
             cache.set("test", "test")
             assert cache.get("test", None) == "test"
+            cache.delete("test")
         except Exception as e:
             logger.error(f"MongoDB 缓存连接失败: {e}, 程序将退出.")
             show_exception(e, regular=False)
             return
+
+    if clean:
+        from .clean import cleaner
+
+        return await cleaner()
 
     if follow:
         from .telegram.debug import follower
@@ -389,6 +473,9 @@ async def main(
                 pool.add(emby_man.schedule_all(), "Emby 保活")
             if subsonic_man:
                 pool.add(subsonic_man.schedule_all(), "Subsonic 保活")
+        if config.noexit:
+            logger.info("处于长期监控模式, 当没有账号时将继续监控等待新配置.")
+            pool.add(asyncio.Event().wait(), "账号配置文件监控")
         try:
             async for t in pool.as_completed():
                 try:

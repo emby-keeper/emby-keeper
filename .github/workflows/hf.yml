@@ -1,0 +1,45 @@
+name: Sync to Hugging Face
+
+on:
+  release:
+    types: [released]
+  workflow_dispatch:
+
+env:
+  HF_SPACE_REPO: ekuser/prompt-generator
+
+jobs:
+  sync-to-hf:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install python_minifier
+
+      - name: Process app.py
+        run: python scripts/hf.py
+
+      - name: Push to Hugging Face
+        run: |
+          cd hf
+          git config --global init.defaultBranch main
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git init
+          git remote add origin https://${{ secrets.HF_USERNAME }}:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/${{ env.HF_SPACE_REPO }}
+          git add .
+          git commit -m "Update for version ${{ github.ref_name }}"
+          git pull origin main --rebase -Xtheirs
+          git push origin main
+        env:
+          HF_USERNAME: ${{ secrets.HF_USERNAME }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}

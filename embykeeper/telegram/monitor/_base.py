@@ -8,7 +8,6 @@ import string
 from typing import Awaitable, Callable, Iterable, List, Optional, Sized, Union
 
 from loguru import logger
-from appdirs import user_data_dir
 from pyrogram import filters
 from pyrogram.enums import ChatType
 from pyrogram.errors import UsernameNotOccupied, UserNotParticipant, FloodWait, ChannelInvalid, ChannelPrivate
@@ -126,6 +125,7 @@ class Monitor:
     debug_no_log = False  # 调试模式不显示冗余日志
     allow_caption: bool = True  # 是否允许带照片的消息
     allow_text: bool = True  # 是否允许不带照片的消息
+    init_first: bool = False  # 先执行自定义初始化函数, 再进行加入群组分析
 
     def __init__(
         self,
@@ -200,55 +200,67 @@ class Monitor:
     async def start(self):
         """监控器的入口函数."""
         self.ctx.start(RunStatus.INITIALIZING)
-        try:
-            chat = await self.client.get_chat(self.chat_name)
-        except UsernameNotOccupied:
-            self.log.warning(f'初始化错误: 群组 "{self.chat_name}" 不存在.')
-            return self.ctx.finish(RunStatus.IGNORE, "群组不存在")
-        except UserNotParticipant:
-            self.log.info(f'跳过监控: 尚未加入群组 "{chat.title}".')
-            return self.ctx.finish(RunStatus.IGNORE, "未加入群组")
-        except KeyError as e:
-            self.log.info(f"初始化错误: 无法访问, 您可能已被封禁.")
-            show_exception(e)
-            return self.ctx.finish(RunStatus.FAIL, "无法访问群组")
-        except (ChannelInvalid, ChannelPrivate) as e:
-            self.log.info(f"跳过监控: 私有群组, 未加入, 已跳过.")
-            return self.ctx.finish(RunStatus.IGNORE, "未加入群组")
-        except FloodWait as e:
-            self.log.info(f"初始化信息: Telegram 要求等待 {e.value} 秒.")
-            if e.value < 360:
-                await asyncio.sleep(e.value)
-            else:
-                self.log.info(
-                    f"初始化信息: Telegram 要求等待 {e.value} 秒, 您可能操作过于频繁, 监控器将停止."
-                )
-                return self.ctx.finish(RunStatus.FAIL, "操作过于频繁")
-        try:
-            if chat.type in (ChatType.GROUP, ChatType.SUPERGROUP):
-                await chat.get_member("me")
-        except UserNotParticipant:
-            self.log.info(f'跳过监控: 尚未加入群组 "{chat.title}".')
-            return self.ctx.finish(RunStatus.IGNORE, "未加入群组")
+        if self.init_first:
+            if not await self.init():
+                self.log.bind(log=True).warning(f"机器人状态初始化失败, 监控将停止.")
+                return self.ctx.finish(RunStatus.FAIL, "初始化失败")
+        chat = None
+        if self.chat_name:
+            try:
+                chat = await self.client.get_chat(self.chat_name)
+            except UsernameNotOccupied:
+                self.log.warning(f'初始化错误: 群组 "{self.chat_name}" 不存在.')
+                return self.ctx.finish(RunStatus.IGNORE, "群组不存在")
+            except UserNotParticipant:
+                self.log.info(f'跳过监控: 尚未加入群组 "{chat.title}".')
+                return self.ctx.finish(RunStatus.IGNORE, "未加入群组")
+            except KeyError as e:
+                self.log.info(f"初始化错误: 无法访问, 您可能已被封禁.")
+                show_exception(e)
+                return self.ctx.finish(RunStatus.FAIL, "无法访问群组")
+            except (ChannelInvalid, ChannelPrivate) as e:
+                self.log.info(f"跳过监控: 私有群组, 未加入, 已跳过.")
+                return self.ctx.finish(RunStatus.IGNORE, "未加入群组")
+            except FloodWait as e:
+                self.log.info(f"初始化信息: Telegram 要求等待 {e.value} 秒.")
+                if e.value < 360:
+                    await asyncio.sleep(e.value)
+                else:
+                    self.log.info(
+                        f"初始化信息: Telegram 要求等待 {e.value} 秒, 您可能操作过于频繁, 监控器将停止."
+                    )
+                    return self.ctx.finish(RunStatus.FAIL, "操作过于频繁")
+            try:
+                if chat.type in (ChatType.GROUP, ChatType.SUPERGROUP):
+                    await chat.get_member("me")
+            except UserNotParticipant:
+                self.log.info(f'跳过监控: 尚未加入群组 "{chat.title}".')
+                return self.ctx.finish(RunStatus.IGNORE, "未加入群组")
 
         if self.additional_auth:
             for a in self.additional_auth:
                 if not await Link(self.client).auth(a, log_func=self.log.info):
                     return self.ctx.finish(RunStatus.IGNORE, "需要额外认证")
 
-        if not await self.init():
-            self.log.bind(log=True).warning(f"机器人状态初始化失败, 监控将停止.")
-            return self.ctx.finish(RunStatus.FAIL, "初始化失败")
+        if not self.init_first:
+            if not await self.init():
+                self.log.bind(log=True).warning(f"机器人状态初始化失败, 监控将停止.")
+                return self.ctx.finish(RunStatus.FAIL, "初始化失败")
 
         if self.notify_create_name:
             self.unique_name = self.get_unique_name()
 
-        if chat.username:
-            spec = (
-                f"[green]{chat.title}[/] [gray50](@{chat.username})[/]" if chat.title else f"@{chat.username}"
-            )
+        if chat:
+            if chat.username:
+                spec = (
+                    f"[green]{chat.title}[/] [gray50](@{chat.username})[/]"
+                    if chat.title
+                    else f"@{chat.username}"
+                )
+            else:
+                spec = f"[green]{chat.title}[/]" if chat.title else f"[green]{chat.id}[/]"
         else:
-            spec = f"[green]{chat.title}[/]" if chat.title else f"[green]{chat.id}[/]"
+            spec = "关键词: " + truncate_str(",".join(to_iterable(self.chat_keyword)), 60)
 
         self.log.info(f"开始监视: {spec}.")
         self.ctx.status = RunStatus.RUNNING

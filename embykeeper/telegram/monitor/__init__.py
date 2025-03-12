@@ -2,10 +2,10 @@ import importlib as _i
 import typing as _t
 
 if _t.TYPE_CHECKING:
-    from ._base import Session, Monitor
+    from ._base import Session, Monitor, UniqueUsername
 
 MENU = {
-    "._base": ["Session", "Monitor"],
+    "._base": ["Session", "Monitor", "UniqueUsername"],
 }
 
 

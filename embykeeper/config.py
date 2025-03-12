@@ -175,48 +175,55 @@ class ConfigManager(ProxyBase):
         c.add(comment("Emby 账号, 您可以重复该片段多次以增加多个账号."))
         c.add(comment(f"详见: https://emby-keeper.github.io/guide/配置文件#emby-account-子项"))
         c.add(comment("=" * 80))
-        c["account"] = [{}, {}]
-        for i in range(2):
-            a: InlineTable = c["account"][i]
-            a.comment(f"第 {i + 1} 个账号")
-            if not i:
-                a.add(nl())
-                a.add(comment("站点域名和端口:"))
-            a["url"] = fake.url(["https"]).rstrip("/") + ":443"
-            if not i:
-                a.add(nl())
-                a.add(comment("用户名和密码:"))
-            a["username"] = fake.profile()["username"]
-            a["password"] = fake.password()
-            if not i:
-                a.add(nl())
-                a.add(comment("模拟观看的随机时长范围 (秒), 可以为单个数字 (120) 或时间范围 ([120, 240]):"))
-            a["time"] = default_emby_account.time
-            if not i:
-                a.add(nl())
-                a.add(comment("以下为进阶配置, 请取消注释 (删除左侧的 #) 以使用:"))
-                a.add(nl())
-                a.add(comment("该服务器是否为 Jellyfin 服务器:"))
-                a.add(comment(item({"jellyfin": True}).as_string()))
-                a.add(comment("每隔几天进行保活, 默认使用全局设置 emby.interval_days:"))
-                a.add(comment(item({"interval_days": default_config.emby.interval_days}).as_string()))
-                a.add(comment("每次进行保活的当日时间范围, 默认使用全局设置 emby.time_range:"))
-                a.add(comment(item({"time_range": default_config.emby.time_range}).as_string()))
-                a.add(comment("使用连续播放, 主要用于增加观看时长:"))
-                a.add(comment(item({"continuous": True}).as_string()))
-                a.add(
-                    comment(
-                        "无法获取视频长度时, 依然允许播放 (默认最大播放 10 分钟左右, 可能播放超出实际长度):"
-                    )
-                )
-                a.add(comment(item({"allow_stream": True}).as_string()))
-                a.add(comment("取消注释以不使用配置文件定义的代理进行连接"))
-                a.add(comment(item({"use_proxy": False}).as_string()))
-                a.add(comment("取消注释以禁用该账户"))
-                a.add(comment(item({"enabled": False}).as_string()))
+        c["account"] = [{}]
+        a: InlineTable = c["account"][0]
+        a.comment(f"第 1 个账号")
+        a.add(nl())
+        a.add(comment("站点域名和端口:"))
+        a["url"] = fake.url(["https"]).rstrip("/") + ":443"
+        a.add(nl())
+        a.add(comment("用户名和密码:"))
+        a["username"] = fake.profile()["username"]
+        a["password"] = fake.password()
+        a.add(nl())
+        a.add(comment("模拟观看的随机时长范围 (秒), 可以为单个数字 (120) 或时间范围 ([120, 240]):"))
+        a["time"] = default_emby_account.time
+        a.add(nl())
+        a.add(comment("以下为进阶配置, 请取消注释 (删除左侧的 #) 以使用:"))
+        a.add(nl())
+        a.add(comment("每隔几天进行保活, 默认使用全局设置 emby.interval_days:"))
+        a.add(comment(item({"interval_days": default_config.emby.interval_days}).as_string()))
+        a.add(comment("每次进行保活的当日时间范围, 默认使用全局设置 emby.time_range:"))
+        a.add(comment(item({"time_range": default_config.emby.time_range}).as_string()))
+        a.add(comment("使用连续播放, 主要用于增加观看时长:"))
+        a.add(comment(item({"continuous": True}).as_string()))
+        a.add(comment("无法获取视频长度时, 依然允许播放 (默认最大播放 10 分钟左右, 可能播放超出实际长度):"))
+        a.add(comment(item({"allow_stream": True}).as_string()))
+        a.add(comment("取消注释以不使用配置文件定义的代理进行连接"))
+        a.add(comment(item({"use_proxy": False}).as_string()))
+        a.add(comment("取消注释以禁用该账户"))
+        a.add(comment(item({"enabled": False}).as_string()))
         doc["emby"] = c
-        doc.add(nl())
 
+        doc.add(comment(f"第 2 个账号, 如需使用请将该段取消注释并修改, 也可以添加更多账号."))
+        a = item(
+            {
+                "emby": {
+                    "account": [
+                        {
+                            "url": fake.url(["https"]).rstrip("/") + ":443",
+                            "username": fake.profile()["username"],
+                            "password": fake.password(),
+                            "time": default_emby_account.time,
+                        }
+                    ]
+                }
+            }
+        )
+        for line in a.as_string().strip().split("\n"):
+            doc.add(comment(line))
+
+        doc.add(nl())
         doc.add(comment("=" * 80))
         doc.add(comment("Telegram 机器人签到相关设置"))
         doc.add(comment(f"详见: https://emby-keeper.github.io/guide/配置文件#checkiner-子项"))
@@ -230,10 +237,10 @@ class ConfigManager(ProxyBase):
         )
         c["time_range"] = default_config.checkiner.time_range
         c.add(nl())
-        c.add(comment(":"))
-        c["random"] = default_config.checkiner.random_start
+        c.add(comment("各个站点签到将在开始后, 等待一定时间随机启动, 使各站点错开 (分钟):"))
+        c["random_start"] = default_config.checkiner.random_start
         c.add(nl())
-        c.add(comment("每个站点签到的最大超时时间:"))
+        c.add(comment("每个站点签到的最大超时时间 (秒):"))
         c["timeout"] = default_config.checkiner.timeout
         c.add(nl())
         c.add(comment("各站点最大可重试次数 (部分站点出于安全考虑有独立的设置):"))
@@ -241,6 +248,9 @@ class ConfigManager(ProxyBase):
         c.add(nl())
         c.add(comment("最大可同时进行的站点数:"))
         c["concurrency"] = 1
+        c.add(nl())
+        c.add(comment("每隔几天进行签到:"))
+        c["interval_days"] = 1
         doc["checkiner"] = c
         c.add(nl())
 
@@ -248,31 +258,64 @@ class ConfigManager(ProxyBase):
         c.add(comment("Telegram 账号, 您可以重复该片段多次以增加多个账号."))
         c.add(comment(f"详见: https://emby-keeper.github.io/guide/配置文件#telegram-account-子项"))
         c.add(comment("=" * 80))
-        c = item({"account": [{}, {}]})
-        for i in range(2):
-            a: InlineTable = c["account"][i]
-            a.comment(f"第 {i + 1} 个账号")
-            if not i:
-                a.add(nl())
-                a.add(comment('带国家区号的账户手机号, 一般为 "+86..."'))
-            a["phone"] = f'+861{fake.numerify(text="##########")}'
-            if not i:
-                a.add(nl())
-                a.add(comment("启用机器人签到系列功能, 默认启用, 设置为 false 以禁用:"))
-            a["checkiner"] = True
-            if not i:
-                a.add(nl())
-                a.add(
-                    comment("启用群组监控系列功能, 包括抢邀请码和回答问题等, 默认禁用, 设置为 true 以启用:")
-                )
-            a["monitor"] = False
-            if not i:
-                a.add(nl())
-                a.add(comment("启用自动水群系列功能, 风险较高, 默认禁用, 设置为 true 以启用:"))
-            a["messager"] = False
-            a.add(nl())
+        c = item({"account": [{}]})
+        a: InlineTable = c["account"][0]
+        a.comment(f"第 1 个账号")
+        a.add(nl())
+        a.add(comment('带国家区号的账户手机号, 一般为 "+86..."'))
+        a["phone"] = f'+861{fake.numerify(text="##########")}'
+        a.add(nl())
+        a.add(comment("启用机器人签到系列功能, 默认启用, 设置为 false 以禁用:"))
+        a["checkiner"] = True
+        a.add(nl())
+        a.add(comment("启用群组监控系列功能, 包括抢邀请码和回答问题等, 默认禁用, 设置为 true 以启用:"))
+        a["monitor"] = False
+        a.add(nl())
+        a.add(comment("启用自动水群系列功能, 风险较高, 默认禁用, 设置为 true 以启用:"))
+        a["messager"] = False
+        a.add(nl())
         doc["telegram"] = c
+        doc.add(comment("针对该账号的独特设置, 如需使用请将该段取消注释并修改. 详见 site 项和 checkiner 项."))
+        a_specific = item(
+            {
+                "telegram": {
+                    "account": [
+                        {
+                            "site": {
+                                "checkiner": ["all"],
+                            },
+                            "checkiner_config": {
+                                "interval_days": 1,
+                            },
+                        }
+                    ]
+                }
+            }
+        )
+        for line in a_specific.as_string().strip().split("\n")[1:]:
+            doc.add(comment(line))
 
+        doc.add(nl())
+
+        doc.add(comment(f"第 2 个账号, 如需使用请将该段取消注释并修改, 也可以添加更多账号."))
+        a = item(
+            {
+                "telegram": {
+                    "account": [
+                        {
+                            "phone": f'+861{fake.numerify(text="##########")}',
+                            "checkiner": True,
+                            "monitor": False,
+                            "messager": False,
+                        }
+                    ]
+                }
+            }
+        )
+        for line in a.as_string().strip().split("\n"):
+            doc.add(comment(line))
+
+        doc.add(nl())
         doc.add(comment("=" * 80))
         doc.add(comment("站点相关设置"))
         doc.add(comment("当您需要禁用某些站点时, 请将该段取消注释并修改."))
@@ -405,12 +448,18 @@ class ConfigManager(ProxyBase):
         c.add(nl())
         c.add(comment("最大可同时进行的站点数:"))
         c["concurrency"] = default_config.subsonic.concurrency
-        c.add(nl())
-        c.add(comment("=" * 80))
-        c.add(comment("Subsonic 账号, 您可以重复该片段多次以增加多个账号."))
-        c.add(comment(f"详见: https://emby-keeper.github.io/guide/配置文件#subsonic-account-子项"))
-        c.add(comment("=" * 80))
-        c["account"] = [{}, {}]
+        doc["subsonic"] = c
+
+        doc.add(nl())
+        doc.add(comment("=" * 80))
+        doc.add(comment("Subsonic 账号, 您可以重复该片段多次以增加多个账号, 如需使用, 请取消注释."))
+        doc.add(comment(f"详见: https://emby-keeper.github.io/guide/配置文件#subsonic-account-子项"))
+        doc.add(comment("=" * 80))
+        doc.add(nl())
+
+        cd = item({})
+        cd["subsonic"] = {"account": [{}, {}]}
+        c = cd["subsonic"]
         for i in range(2):
             a: InlineTable = c["account"][i]
             a.comment(f"第 {i + 1} 个账号")
@@ -429,7 +478,10 @@ class ConfigManager(ProxyBase):
             a["time"] = default_emby_account.time
             if not i:
                 a.add(nl())
-        doc["subsonic"] = c
+
+        for line in cd.as_string().strip().split("\n"):
+            doc.add(comment(line))
+
         return dumps(doc)
 
     def reset(self):
@@ -494,8 +546,11 @@ class ConfigManager(ProxyBase):
                 conf_file = default_conf_file
             if conf_file:
                 if conf_file.suffix.lower() == ".toml":
-                    with open(conf_file, "rb") as f:
-                        deep_update(cfg_dict, tomllib.load(f))
+                    try:
+                        with open(conf_file, "rb") as f:
+                            deep_update(cfg_dict, tomllib.load(f))
+                    except tomllib.TOMLDecodeError:
+                        logger.error(f'配置文件 "{conf_file}" 中的 TOML 格式错误.')
                 else:
                     logger.error(f'配置文件 "{conf_file}" 不是 TOML 格式的配置文件.')
                     return False

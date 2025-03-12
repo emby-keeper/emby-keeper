@@ -105,6 +105,8 @@ class BaseBotCheckin(ABC):
         self.finished = asyncio.Event()  # 签到完成事件
         self.log = self.ctx.bind_logger(logger.bind(name=self.name, username=client.me.name))  # 日志组件
 
+        self._task = None  # 主任务
+
     @property
     def retries(self):
         return self._retries or config.checkiner.retries
@@ -116,7 +118,9 @@ class BaseBotCheckin(ABC):
     async def _start(self):
         """签到器的入口函数的错误处理外壳."""
         try:
-            return await self.start()
+            self.client.stop_handlers.append(self.stop)
+            self._task = asyncio.create_task(self.start())
+            return await self._task
         except Exception as e:
             if config.nofail:
                 self.log.warning(f"初始化异常错误, 签到器将停止.")
@@ -124,10 +128,21 @@ class BaseBotCheckin(ABC):
                 return self.ctx.finish(RunStatus.ERROR, "异常错误")
             else:
                 raise
+        finally:
+            self.client.stop_handlers.remove(self.stop)
+            self._task = None
 
     @abstractmethod
     async def start(self) -> RunContext:
         pass
+
+    async def stop(self):
+        if self._task:
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
 
 
 class BotCheckin(BaseBotCheckin):
@@ -408,20 +423,20 @@ class BotCheckin(BaseBotCheckin):
             # 创建新的任务并存储
             task = asyncio.create_task(self.message_handler(client, message))
             self._handler_tasks.add(task)
-            try:
-                await task
-            finally:
-                self._handler_tasks.remove(task)
+            await task
         except OSError as e:
             self.log.info(f'发生错误: "{e}", 正在重试.')
             show_exception(e)
             await self.retry()
             message.continue_propagation()
         except asyncio.CancelledError:
-            # 当任务被取消时，确保从集合中移除
-            if task in self._handler_tasks:
-                self._handler_tasks.remove(task)
-            raise
+            task.cancel()
+            try:
+                await asyncio.wait_for(task, 5)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                pass
+            finally:
+                raise
         except Exception as e:
             if not config.nofail:
                 await self.fail()
@@ -433,6 +448,9 @@ class BotCheckin(BaseBotCheckin):
                 message.continue_propagation()
         else:
             message.continue_propagation()
+        finally:
+            if task in self._handler_tasks:
+                self._handler_tasks.remove(task)
 
     async def message_handler(self, client: Client, message: Message, type=None):
         """消息处理入口函数."""

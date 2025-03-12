@@ -20,7 +20,7 @@ import signal
 import tomlkit
 import typer
 from loguru import logger
-from flask import Flask, render_template, request, redirect, url_for, jsonify, abort
+from flask import Flask, render_template, request, redirect, url_for, jsonify, abort, Blueprint
 from flask_socketio import SocketIO
 from flask_login import LoginManager, login_user, login_required, current_user
 
@@ -32,12 +32,14 @@ except ImportError:
 from . import __version__
 
 cli = typer.Typer()
-app = Flask(__name__, static_folder="templates/assets")
+app = Flask(__name__, static_folder="templates/assets", static_url_path=None)
 app.config["SECRET_KEY"] = os.urandom(24)
+app.config["BASE_PREFIX"] = "/"
+
 socketio = SocketIO(app, cors_allowed_origins="*")
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = "login"
+login_manager.login_view = "main.login"
 
 app.config["lock"] = threading.Lock()
 app.config["args"] = []
@@ -48,6 +50,9 @@ app.config["faillog"] = []
 app.config["config"] = os.environ.get("EK_CONFIG", "")
 
 version = f"V{__version__}"
+
+# 创建蓝图
+bp = Blueprint("main", __name__)
 
 
 class DummyUser:
@@ -75,9 +80,9 @@ def exit_handler():
         kill_proc(proc)
 
 
-@app.route("/")
+@bp.route("/")
 def index():
-    return redirect(url_for("console"))
+    return redirect(url_for("main.console"))
 
 
 def is_authenticated():
@@ -88,18 +93,18 @@ def is_authenticated():
         return False
 
 
-@app.route("/console")
+@bp.route("/console")
 @login_required
 def console():
-    return render_template("console.html", version=version)
+    return render_template("console.html", version=version, prefix=app.config["BASE_PREFIX"])
 
 
-@app.route("/login", methods=["GET"])
+@bp.route("/login", methods=["GET"])
 def login():
-    return render_template("login.html", version=version)
+    return render_template("login.html", version=version, prefix=app.config["BASE_PREFIX"])
 
 
-@app.route("/login", methods=["POST"])
+@bp.route("/login", methods=["POST"])
 def login_submit():
     password = request.form.get("password", "")
     webpass = os.environ.get("EK_WEBPASS", "")
@@ -110,20 +115,20 @@ def login_submit():
     else:
         if password == webpass:
             login_user(DummyUser())
-            return redirect(request.args.get("next") or url_for("index"))
+            return redirect(request.args.get("next") or url_for("main.index"))
         else:
             emsg = "密码错误, 请重试."
             app.config["faillog"].append(time.time())
-    return render_template("login.html", emsg=emsg, version=version)
+    return render_template("login.html", emsg=emsg, version=version, prefix=app.config["BASE_PREFIX"])
 
 
-@app.route("/config", methods=["GET"])
+@bp.route("/config", methods=["GET"])
 @login_required
 def config():
-    return render_template("config.html", version=version)
+    return render_template("config.html", version=version, prefix=app.config["BASE_PREFIX"])
 
 
-@app.route("/config/current", methods=["GET"])
+@bp.route("/config/current", methods=["GET"])
 def config_current():
     if not is_authenticated():
         return "Not authenticated", 401
@@ -141,7 +146,7 @@ def config_current():
     return jsonify(data), 200
 
 
-@app.route("/config/example", methods=["GET"])
+@bp.route("/config/example", methods=["GET"])
 def config_example():
     if not is_authenticated():
         return "Not authenticated", 401
@@ -149,7 +154,7 @@ def config_example():
     return jsonify(example), 200
 
 
-@app.route("/config/save", methods=["POST"])
+@bp.route("/config/save", methods=["POST"])
 def config_save():
     if not is_authenticated():
         return "Not authenticated", 401
@@ -163,12 +168,12 @@ def config_save():
     return jsonify(encoded_data), 200
 
 
-@app.route("/healthz")
+@bp.route("/healthz")
 def healthz():
     return "200 OK"
 
 
-@app.route("/heartbeat")
+@bp.route("/heartbeat")
 def heartbeat():
     webpass = os.environ.get("EK_WEBPASS", "")
     password = request.args.get("pass", None)
@@ -184,9 +189,9 @@ def heartbeat():
         return abort(403)
 
 
-@app.errorhandler(404)
+@bp.errorhandler(404)
 def page_not_found(e):
-    return render_template("404.html", version=version), 404
+    return render_template("404.html", version=version, prefix=app.config["BASE_PREFIX"]), 404
 
 
 @socketio.on("pty-input", namespace="/pty")
@@ -221,8 +226,8 @@ def handle_connect():
 
 
 @socketio.on("disconnect", namespace="/pty")
-def handle_disconnect():
-    logger.debug(f"Console disconnected from {request.sid}")
+def handle_disconnect(reason=""):
+    logger.debug(f"Console disconnected from {request.sid} ({reason})")
 
 
 @socketio.on_error_default
@@ -301,17 +306,6 @@ def start(data, auth=True):
             set_size(app.config["fd"], data["rows"], data["cols"])
 
 
-def kill_proc(proc: Popen):
-    proc.send_signal(signal.SIGINT)
-    for _ in range(10):
-        poll = proc.poll()
-        if poll is not None:
-            break
-    else:
-        proc.kill()
-    logger.debug(f"Embykeeper killed: {proc.pid}.")
-
-
 @socketio.on("embykeeper_kill", namespace="/pty")
 def kill():
     logger.debug("Received embykeeper_kill socketio signal.")
@@ -323,8 +317,31 @@ def kill():
             app.config["fd"] = None
             app.config["proc"] = None
             app.config["hist"] = ""
-    if proc is not None:
-        socketio.start_background_task(target=kill_proc, proc=proc)
+            kill_proc(proc)
+            proc.wait()
+
+
+def kill_proc(proc: Popen):
+    try:
+        proc.send_signal(signal.SIGINT)
+        for _ in range(20):
+            if proc.poll() is not None:
+                break
+            time.sleep(0.1)
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+        logger.debug(f"Embykeeper killed: {proc.pid}.")
+    except Exception as e:
+        logger.error(f"Error killing process: {e}")
+
+
+def set_static_url_path(app, prefix):
+    app.static_url_path = f"{prefix}/assets"
+    app.view_functions.pop("static", None)
+    app.add_url_rule(
+        f"{app.static_url_path}/<path:filename>", endpoint="static", view_func=app.send_static_file
+    )
 
 
 @cli.command(context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
@@ -334,11 +351,17 @@ def run(
     host: str = "0.0.0.0",
     debug: bool = False,
     wait: bool = False,
+    prefix: str = typer.Option("", envvar="EK_BASE_PREFIX", help="Base URL prefix (e.g. /ek)"),
 ):
     app.config["args"] = ctx.args
+    app.config["BASE_PREFIX"] = prefix.rstrip("/")
+    set_static_url_path(app, app.config["BASE_PREFIX"])
+    # 注册蓝图时设置 url_prefix
+    app.register_blueprint(bp, url_prefix=app.config["BASE_PREFIX"])
+    app.config["config"] = os.environ.get("EK_CONFIG", "")
     if not wait:
         start_proc(instant=True)
-    logger.info(f"Embykeeper webserver started at {host}:{port}.")
+    logger.info(f"Embykeeper webserver started at {host}:{port} with prefix {prefix or '/'}")
     socketio.run(app, port=port, host=host, debug=debug)
 
 

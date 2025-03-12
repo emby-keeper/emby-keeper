@@ -11,7 +11,7 @@ from embykeeper.schedule import Scheduler
 from embykeeper.schema import TelegramAccount
 from embykeeper.config import config
 from embykeeper.runinfo import RunContext, RunStatus
-from embykeeper.utils import AsyncTaskPool
+from embykeeper.utils import AsyncTaskPool, show_exception
 
 from .checkiner import BaseBotCheckin
 from .dynamic import extract, get_cls, get_names
@@ -27,34 +27,38 @@ class CheckinerManager:
 
     def __init__(self):
         self._tasks: Dict[str, asyncio.Task] = {}  # phone -> task
+        self._site_tasks: Dict[str, Dict[str, asyncio.Task]] = {}  # phone -> site -> task
         self._schedulers: Dict[str, Scheduler] = {}  # phone -> scheduler
-        self._running: Set[str] = set()  # Currently running phones
         self._pool = AsyncTaskPool()
 
-        # Set up config change callbacks
         config.on_list_change("telegram.account", self._handle_account_change)
 
     def _handle_account_change(self, added: List[TelegramAccount], removed: List[TelegramAccount]):
         """Handle account additions and removals"""
         for account in removed:
             self.stop_account(account.phone)
-            logger.debug(f"{account.phone} 账号的签到及其计划任务已被清除.")
+            logger.info(f"{account.phone} 账号的签到及其计划任务已被清除.")
 
         for account in added:
             scheduler = self.schedule_account(account)
             self._pool.add(scheduler.schedule())
-            logger.debug(f"新增的 {account.phone} 账号的计划任务已增加.")
+            logger.info(f"新增的 {account.phone} 账号的计划任务已增加.")
 
     def stop_account(self, phone: str):
         """Stop scheduling and running tasks for an account"""
-        if phone in self._schedulers:
-            del self._schedulers[phone]
-
+        # Cancel main checkin task
         if phone in self._tasks:
             self._tasks[phone].cancel()
             del self._tasks[phone]
 
-        self._running.discard(phone)
+        # Cancel all site-specific tasks
+        if phone in self._site_tasks:
+            for task in self._site_tasks[phone].values():
+                task.cancel()
+            del self._site_tasks[phone]
+
+        if phone in self._schedulers:
+            del self._schedulers[phone]
 
     def schedule_account(self, account: TelegramAccount):
         """Schedule checkins for an account"""
@@ -73,8 +77,15 @@ class CheckinerManager:
                 parent_ids=[account_ctx.id, date_ctx.id],
             )
 
+        def func(ctx: RunContext):
+            if account.phone in self._tasks:
+                self._tasks[account.phone].cancel()
+                del self._tasks[account.phone]
+            task = self._tasks[account.phone] = asyncio.create_task(self.run_account(ctx, account))
+            return task
+
         scheduler = Scheduler.from_str(
-            lambda ctx: self.run_account(ctx, account),
+            func=func,
             interval_days=config_to_use.interval_days,
             time_range=config_to_use.time_range,
             on_next_time=on_next_time,
@@ -96,74 +107,71 @@ class CheckinerManager:
 
     async def run_account(self, ctx: RunContext, account: TelegramAccount, instant: bool = False):
         """Run checkin for a single account"""
-        if account.phone in self._running:
-            logger.warning(f"账户 {account.phone} 的签到已经在执行.")
-            return
+        async with ClientsSession([account]) as clients:
+            async for a, client in clients:
+                await self._run_account(ctx, a, client, instant)
 
-        self._running.add(account.phone)
-        try:
-            async with ClientsSession([account]) as clients:
-                async for a, client in clients:
-                    await self._run_account(ctx, a, client, instant),
-        finally:
-            self._running.discard(account.phone)
-
-    def schedule_one(
+    def schedule_reschedule(
         self, ctx: RunContext, at: datetime, account: TelegramAccount, site: str
     ) -> asyncio.Task:
-        account_ctx = RunContext.get_or_create(f"checkiner.account.{account.phone}")
-        site_ctx = RunContext.prepare(
-            description=f"{account.phone} 账号 {site} 站点重新签到", parent_ids=[account_ctx.id, ctx.id]
-        )
-        site_ctx.reschedule = (ctx.reschedule or 0) + 1
+        try:
+            account_ctx = RunContext.get_or_create(f"checkiner.account.{account.phone}")
+            site_ctx = RunContext.prepare(
+                description=f"{account.phone} 账号 {site} 站点重新签到", parent_ids=[account_ctx.id, ctx.id]
+            )
+            site_ctx.reschedule = (ctx.reschedule or 0) + 1
 
-        async def _schedule():
-            # 计算延迟时间(秒)
-            delay = (at - datetime.now()).total_seconds()
-            if delay > 0:
-                logger.debug(
-                    f"已安排账户 {account.phone} 的 {site} 站点在 {at.strftime('%m-%d %H:%M %p')} 重新尝试签到."
-                )
-                await asyncio.sleep(10)
-            await self._run_single_site(site_ctx, account, site)
+            async def _schedule():
+                # 计算延迟时间(秒)
+                delay = (at - datetime.now()).total_seconds()
+                if delay > 0:
+                    logger.debug(
+                        f"已安排账户 {account.phone} 的 {site} 站点在 {at.strftime('%m-%d %H:%M %p')} 重新尝试签到."
+                    )
+                    await asyncio.sleep(delay)
+                if account.phone in self._site_tasks and site in self._site_tasks[account.phone]:
+                    self._site_tasks[account.phone][site].cancel()
+                    del self._site_tasks[account.phone][site]
+                await self._run_single_site(site_ctx, account, site)
 
-        return asyncio.create_task(_schedule())
+            task = asyncio.create_task(_schedule())
+            # Initialize _site_tasks for this phone if it doesn't exist
+            if account.phone not in self._site_tasks:
+                self._site_tasks[account.phone] = {}
+            # Store the task
+            self._site_tasks[account.phone][site] = task
+            return task
+        except Exception as e:
+            logger.warning(f"重新安排 {site} 站点签到时间失败: {e}")
+            show_exception(e, regular=False)
 
     async def _run_single_site(self, ctx: RunContext, account: TelegramAccount, site_name: str):
-        if account.phone in self._running:
-            logger.warning(f"账户 {account.phone} 的签到已经在执行.")
-            return
+        async with ClientsSession([account]) as clients:
+            async for _, client in clients:
+                cls = get_cls("checkiner", names=[site_name])[0]
+                config_to_use = account.checkiner_config or config.checkiner
 
-        self._running.add(account.phone)
-        try:
-            async with ClientsSession([account]) as clients:
-                async for _, client in clients:
-                    cls = get_cls("checkiner", names=[site_name])[0]
-                    config_to_use = account.checkiner_config or config.checkiner
+                c: BaseBotCheckin = cls(
+                    client,
+                    context=ctx,
+                    retries=config_to_use.retries,
+                    timeout=config_to_use.timeout,
+                    config=config_to_use.get_site_config(site_name),
+                )
 
-                    c: BaseBotCheckin = cls(
-                        client,
-                        context=ctx,
-                        retries=config_to_use.retries,
-                        timeout=config_to_use.timeout,
-                        config=config_to_use.get_site_config(site_name),
-                    )
+                log = logger.bind(username=client.me.name, name=c.name)
 
-                    log = logger.bind(username=client.me.name, name=c.name)
-
-                    result = await c._start()
-                    if result.status == RunStatus.SUCCESS:
-                        log.info("重新签到成功.")
-                    elif result.status == RunStatus.NONEED:
-                        log.info("多次重新签到后依然为已签到状态, 已跳过.")
-                    elif result.status == RunStatus.RESCHEDULE:
-                        if c.ctx.next_time:
-                            log.debug("继续等待重新签到.")
-                            self.schedule_one(ctx, c.ctx.next_time, account, site_name)
-                    else:
-                        log.debug("站点重新签到失败.")
-        finally:
-            self._running.discard(account.phone)
+                result = await c._start()
+                if result.status == RunStatus.SUCCESS:
+                    log.info("重新签到成功.")
+                elif result.status == RunStatus.NONEED:
+                    log.info("多次重新签到后依然为已签到状态, 已跳过.")
+                elif result.status == RunStatus.RESCHEDULE:
+                    if c.ctx.next_time:
+                        log.debug("继续等待重新签到.")
+                        self.schedule_reschedule(ctx, c.ctx.next_time, account, site_name)
+                else:
+                    log.debug("站点重新签到失败.")
 
     async def _run_account(
         self, ctx: RunContext, account: TelegramAccount, client: Client, instant: bool = False
@@ -194,7 +202,10 @@ class CheckinerManager:
         sem = asyncio.Semaphore(config_to_use.concurrency)
         checkiners = []
         for cls in clses:
-            site_name = cls.__module__.rsplit(".", 1)[-1]
+            if hasattr(cls, "templ_name"):
+                site_name = cls.templ_name
+            else:
+                site_name = cls.__module__.rsplit(".", 1)[-1]
             site_ctx = RunContext.prepare(f"{site_name} 站点签到", parent_ids=ctx.id)
             checkiners.append(
                 cls(
@@ -215,7 +226,7 @@ class CheckinerManager:
             tasks.append(task)
 
         if names:
-            log.debug(f'已启用签到器: {", ".join(names)}')
+            log.info(f'已启用签到器: {", ".join(names)}')
 
         results: List[Tuple[BaseBotCheckin, RunContext]] = await asyncio.gather(*tasks)
 
@@ -232,9 +243,12 @@ class CheckinerManager:
             elif result.status == RunStatus.NONEED:
                 checked.append(c.name)
             elif result.status == RunStatus.RESCHEDULE:
-                site_name = c.__module__.rsplit(".", 1)[-1]
+                if hasattr(c, "templ_name"):
+                    site_name = c.templ_name
+                else:
+                    site_name = cls.__module__.rsplit(".", 1)[-1]
                 if c.ctx.next_time:
-                    self.schedule_one(ctx, c.ctx.next_time, account, site_name)
+                    self.schedule_reschedule(ctx, c.ctx.next_time, account, site_name)
                 checked.append(c.name)
             else:
                 failed.append(c.name)

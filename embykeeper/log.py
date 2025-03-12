@@ -1,11 +1,20 @@
+from __future__ import annotations
+
+import inspect
 from logging import Formatter
 import asyncio
+import logging
+from typing import TYPE_CHECKING
 
 from loguru import logger
 from rich.logging import RichHandler
+from rich.text import Text
 
 from . import var
 from .utils import to_iterable
+
+if TYPE_CHECKING:
+    from loguru import Logger
 
 pad = " " * 23
 
@@ -66,3 +75,28 @@ def initialize(level="INFO", **kw):
     logger.add(handler, format=formatter, level=level, colorize=False)
 
     constants.LOG_THRESHOLD_FOR_CONNLOST_WRITES = 1000000
+
+
+class InterceptHandler(logging.Handler):
+    """A logging handler that intercepts standard logging messages and redirects them to loguru."""
+
+    def __init__(self, level: int = 0):
+        super().__init__(level)
+
+    def emit(self, record):
+        try:
+            level = logger.level(record.levelname).name
+        except ValueError:
+            level = record.levelno
+        frame, depth = inspect.currentframe(), 0
+        while frame and (depth == 0 or frame.f_code.co_filename == logging.__file__):
+            frame = frame.f_back
+            depth += 1
+        text = record.getMessage()
+        text = Text.from_ansi(text).plain
+        text = f"[{level}] ({record.name}) {text}"
+        logger.opt(depth=depth, exception=record.exc_info).debug(text)
+
+
+def apply_logging_adapter(level: int = 20):
+    logging.basicConfig(handlers=[InterceptHandler()], level=level, force=True)

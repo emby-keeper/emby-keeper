@@ -26,19 +26,16 @@ concurrency = 1
 [[emby.account]] # 第 1 个账号
 
 # 站点域名和端口:
-url = "https://lucas.com:443"
+url = "https://www.mckinney.com:443"
 
 # 用户名和密码:
-username = "derrickchristian"
-password = "+0X%H*Dh83"
+username = "cummingsbrett"
+password = "YFyQ1Nrv8@"
 
 # 模拟观看的随机时长范围 (秒), 可以为单个数字 (120) 或时间范围 ([120, 240]):
 time = [300, 600]
 
 # 以下为进阶配置, 请取消注释 (删除左侧的 #) 以使用:
-
-# 该服务器是否为 Jellyfin 服务器:
-# jellyfin = true
 
 # 每隔几天进行保活, 默认使用全局设置 emby.interval_days:
 # interval_days = "<7,12>"
@@ -58,11 +55,12 @@ time = [300, 600]
 # 取消注释以禁用该账户
 # enabled = false
 
-[[emby.account]] # 第 2 个账号
-url = "https://mills.com:443"
-username = "lynn43"
-password = "KgF#cFXN^2"
-time = [300, 600]
+# 第 2 个账号, 如需使用请将该段取消注释并修改, 也可以添加更多账号.
+# [[emby.account]]
+# url = "https://hernandez.com:443"
+# username = "fisherjay"
+# password = "*a355P0n+n"
+# time = [300, 600]
 
 # ================================================================================
 # Telegram 机器人签到相关设置
@@ -74,10 +72,10 @@ time = [300, 600]
 # 每次进行进行 Telegram 签到的当日时间范围, 可以为单个时间 ("8:00AM") 或时间范围 ("<8:00AM,10:00AM>"):
 time_range = "<11:00AM,11:00PM>"
 
-# :
-random = 60
+# 各个站点签到将在开始后, 等待一定时间随机启动, 使各站点错开 (分钟):
+random_start = 60
 
-# 每个站点签到的最大超时时间:
+# 每个站点签到的最大超时时间 (秒):
 timeout = 120
 
 # 各站点最大可重试次数 (部分站点出于安全考虑有独立的设置):
@@ -85,6 +83,9 @@ retries = 4
 
 # 最大可同时进行的站点数:
 concurrency = 1
+
+# 每隔几天进行签到:
+interval_days = 1
 
 # ================================================================================
 # Telegram 账号, 您可以重复该片段多次以增加多个账号.
@@ -94,7 +95,7 @@ concurrency = 1
 [[telegram.account]] # 第 1 个账号
 
 # 带国家区号的账户手机号, 一般为 "+86..."
-phone = "+8617273018546"
+phone = "+8613570866616"
 
 # 启用机器人签到系列功能, 默认启用, 设置为 false 以禁用:
 checkiner = true
@@ -105,16 +106,24 @@ monitor = false
 # 启用自动水群系列功能, 风险较高, 默认禁用, 设置为 true 以启用:
 messager = false
 
-[[telegram.account]] # 第 2 个账号
-phone = "+8616987483316"
-checkiner = true
-monitor = false
-messager = false
+# 针对该账号的独特设置, 如需使用请将该段取消注释并修改. 详见 site 项和 checkiner 项.
+# [telegram.account.site]
+# checkiner = ["all"]
+# 
+# [telegram.account.checkiner_config]
+# interval_days = 1
+
+# 第 2 个账号, 如需使用请将该段取消注释并修改, 也可以添加更多账号.
+# [[telegram.account]]
+# phone = "+8612606382638"
+# checkiner = true
+# monitor = false
+# messager = false
 
 # ================================================================================
 # 站点相关设置
 # 当您需要禁用某些站点时, 请将该段取消注释并修改.
-# 该部分内容是根据 Embykeeper 7.0.14 生成的.
+# 该部分内容是根据 Embykeeper 7.1.17 生成的.
 # 详见: https://emby-keeper.github.io/guide/配置文件#site-子项
 # ================================================================================
 
@@ -136,13 +145,13 @@ messager = false
 
 # 默认启用站点:
 # [site]
-# checkiner = ["apoppro", "aurora", "awatv", "cc", "datasgk", "dvfilm", "epub", "feiyue", "feiyuedpx", "future", "ikunmusic", "jingzhe", "jsq", "july", "levilde", "lily", "lyrebird", "magic", "micu", "misty", "mjj", "mooncake", "moonkk", "moyunge", "nebula", "nebula_old", "pandatv", "pandatv_group", "peach", "pilipili", "plumber", "pornemby", "raismusic", "saturday", "sfcju", "shufu", "tanhua", "tdck", "tdck_new", "terminus", "tiannan", "tiannanus", "watermelon", "worldline", "yomo", "zm"]
+# checkiner = ["apoppro", "aurora", "awatv", "cc", "datasgk", "dvfilm", "epub", "feiyue", "feiyuedpx", "future", "ikunmusic", "jingzhe", "jsq", "july", "kiku", "levilde", "lily", "lyrebird", "magic", "micu", "misty", "mjj", "mooncake", "moonkk", "moyunge", "nebula", "nebula_old", "pandatv", "pandatv_group", "peach", "pilipili", "plumber", "pornemby", "raismusic", "saturday", "sfcju", "shufu", "tanhua", "tdck", "tdck_new", "terminus", "tiannan", "tiannanus", "watermelon", "worldline", "yomo", "zm"]
 # monitor = ["bgk", "future", "infinity_fly", "misty", "pornemby_answer", "pornemby_double", "pornemby_dragon_rain", "pornemby_exam", "pornemby_nohp", "viper"]
 # messager = []
 
 # 全部可用站点:
 # [site]
-# checkiner = ["agentsgk", "aisgk", "aivbi", "akile", "akile_group", "akuai", "alpha", "apop", "apoppro", "aurora", "awamusic", "awatv", "baidusgk", "bearsgk", "bingdaosgk", "bitsgk", "bluesea", "bostsgk", "bytevirt_group", "carll1sgk", "carll2sgk", "cc", "charon", "charon_old", "chunjiangsgk", "ciji", "datasgk", "dingdangsgk", "dogsgk", "dvfilm", "embyhub", "epub", "fanhuasgk", "feiji", "feiyue", "feiyuedpx", "feiyuemusic", "feiyuemusic_group_old", "future", "happy", "heisi", "hka", "huasgk", "ikunmusic", "infsgk", "ingeeksgk", "jinding", "jingzhe", "jms", "jms_iptv", "jms_old", "johnsgk", "jsq", "judog", "july", "koisgk", "levilde", "lily", "ljyy", "ljyy_old", "lyrebird", "m78", "magic", "marmot_group_old", "mastersgk", "micu", "minisgk", "misty", "mjj", "mooncake", "moonkk", "moshensgk", "moyunge", "navidrome", "nebula", "nebula_old", "niaoge", "oixel", "pandatv", "pandatv_group", "peach", "pilipili", "pingansgk", "plumber", "pornemby", "qingfengsgk", "raismusic", "rednosesgk", "saturday", "seedsgk", "sfcju", "shufu", "singularity", "skysink", "sssq", "starcat", "starsgk", "tanhua", "tdck", "tdck_new", "temby", "temby_beta", "temby_old", "terminus", "terminus_old", "theend", "tianmaosgk", "tiannan", "tiannanus", "unionsgk", "watermelon", "worldline", "xraysgk", "yomo", "zhihusgk", "zhipian", "zhushousgk", "zm"]
+# checkiner = ["agentsgk", "aisgk", "aivbi", "akile", "akile_group", "akuai", "alpha", "apop", "apoppro", "aurora", "awamusic", "awatv", "baidusgk", "bearsgk", "bingdaosgk", "bitsgk", "bluesea", "bostsgk", "bytevirt_group", "carll1sgk", "carll2sgk", "cc", "charon", "charon_old", "chunjiangsgk", "ciji", "datasgk", "dingdangsgk", "dogsgk", "dvfilm", "embyhub", "epub", "fanhuasgk", "feiji", "feiyue", "feiyuedpx", "feiyuemusic", "feiyuemusic_group_old", "future", "happy", "heisi", "hka", "huasgk", "ikunmusic", "infsgk", "ingeeksgk", "jinding", "jingzhe", "jms", "jms_iptv", "jms_old", "johnsgk", "jsq", "judog", "july", "kiku", "koisgk", "levilde", "lily", "ljyy", "ljyy_old", "lyrebird", "m78", "magic", "marmot_group_old", "mastersgk", "micu", "minisgk", "misty", "mjj", "mooncake", "moonkk", "moshensgk", "moyunge", "navidrome", "nebula", "nebula_old", "niaoge", "oixel", "pandatv", "pandatv_group", "peach", "pilipili", "pingansgk", "plumber", "pornemby", "qingfengsgk", "raismusic", "rednosesgk", "saturday", "seedsgk", "sfcju", "shufu", "singularity", "skysink", "sssq", "starcat", "starsgk", "tanhua", "tdck", "tdck_new", "temby", "temby_beta", "temby_old", "terminus", "terminus_old", "theend", "tianmaosgk", "tiannan", "tiannanus", "unionsgk", "watermelon", "worldline", "xraysgk", "yomo", "zhihusgk", "zhipian", "zhushousgk", "zm"]
 # monitor = ["bgk", "embyhub", "follow", "future", "infinity_fly", "judog", "misty", "polo", "pornemby_alert", "pornemby_answer", "pornemby_double", "pornemby_dragon_rain", "pornemby_exam", "pornemby_nohp", "pornemby_register", "shufu", "terminus_exam", "viper"]
 # messager = ["marmot", "nakonako", "pornemby", "smart_pornemby"]
 
@@ -190,25 +199,25 @@ interval_days = "<7,12>"
 concurrency = 1
 
 # ================================================================================
-# Subsonic 账号, 您可以重复该片段多次以增加多个账号.
+# Subsonic 账号, 您可以重复该片段多次以增加多个账号, 如需使用, 请取消注释.
 # 详见: https://emby-keeper.github.io/guide/配置文件#subsonic-account-子项
 # ================================================================================
 
-[[subsonic.account]] # 第 1 个账号
-
-# 站点域名和端口:
-url = "https://www.obrien.info:443"
-
-# 用户名和密码:
-username = "morganlance"
-password = "@c!P8I5hW#"
-
-# 模拟观看的随机时长范围 (秒), 可以为单个数字 (120) 或时间范围 ([120, 240]):
-time = [300, 600]
-
-[[subsonic.account]] # 第 2 个账号
-url = "https://www.wade.com:443"
-username = "klinecameron"
-password = "O3Ccz!ag^3"
-time = [300, 600]
+# [[subsonic.account]] # 第 1 个账号
+# 
+# # 站点域名和端口:
+# url = "https://www.mendez-noble.com:443"
+# 
+# # 用户名和密码:
+# username = "jonathansimmons"
+# password = "560!NRqt)n"
+# 
+# # 模拟观看的随机时长范围 (秒), 可以为单个数字 (120) 或时间范围 ([120, 240]):
+# time = [300, 600]
+# 
+# [[subsonic.account]] # 第 2 个账号
+# url = "https://www.griffith.org:443"
+# username = "robert15"
+# password = "_bZnCdeFs0"
+# time = [300, 600]
 

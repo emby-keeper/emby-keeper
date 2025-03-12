@@ -115,7 +115,7 @@ async def interactive_config():
             logger.info("发送关键日志消息到以下哪个账户?")
             logger.info(f"\t0. 不使用消息推送功能")
             for i, t in enumerate(telegram_accounts):
-                logger.info(f'\t{i+1}. {t["phone"]}')
+                logger.info(f"\t{i+1}. {t.phone}")
             selected = IntPrompt.ask(pad + "请选择", default=1, console=console)
             if selected:
                 if selected > 0:

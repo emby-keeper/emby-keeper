@@ -77,15 +77,22 @@ window.addEventListener('DOMContentLoaded', function() {
 
     var restartBtn = document.getElementById("restart-btn");
     restartBtn.addEventListener('click', () => {
-        socket.emit("embykeeper_kill");
-        socket.disconnect();
         var statusMsg = document.getElementById("status-msg");
-        statusMsg.textContent = "程序正在重启"
+        statusMsg.textContent = "程序正在重启";
         console.info("Web console restarting.");
-        socket.open();
+
+        // 先发送终止信号
+        socket.emit("embykeeper_kill");
+
+        // 等待一段时间后再重连
+        setTimeout(() => {
+            socket.disconnect();
+            setTimeout(() => {
+                socket.connect();
+            }, 1000);
+        }, 1000);
     });
 
-    // Socket event handlers
     socket.on("connect_error", (error) => {
         console.error("Connection error:", error);
     });

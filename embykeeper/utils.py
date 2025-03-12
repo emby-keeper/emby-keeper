@@ -1,7 +1,6 @@
 import asyncio
 from contextlib import asynccontextmanager
 from datetime import date, datetime, time, timedelta
-from functools import wraps
 from pathlib import Path
 import random
 import sys
@@ -10,7 +9,6 @@ import traceback
 from typing import Any, Coroutine, Iterable, Optional, Union
 
 from loguru import logger
-from typer import Typer, Exit
 
 from . import var, __url__, __name__, __version__
 from .schema import ProxyConfig
@@ -115,47 +113,6 @@ def show_exception(e, regular=True):
         var.console.rule()
     else:
         logger.opt(exception=e).debug("错误详情:")
-
-
-class AsyncTyper(Typer):
-    """Typer 的异步版本, 所有命令函数都将以异步形式调用."""
-
-    def async_command(self, *args, **kwargs):
-        def decorator(async_func):
-            @wraps(async_func)
-            def sync_func(*_args, **_kwargs):
-                async def main():
-                    try:
-                        await async_func(*_args, **_kwargs)
-                    except Exception as e:
-                        print("\r", end="", flush=True)
-                        logger.critical(f"发生关键错误, {__name__.capitalize()} 将退出.")
-                        show_exception(e, regular=False)
-                        sys.exit(1)
-                    else:
-                        logger.info(f"所有任务已完成, 欢迎您再次使用 {__name__.capitalize()}.")
-
-                try:
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    loop.run_until_complete(main())
-                except KeyboardInterrupt:
-                    print("\r正在停止...\r", end="", flush=True, file=sys.stderr)
-                except Exit as e:
-                    sys.exit(e.exit_code)
-                finally:
-                    tasks = asyncio.all_tasks(loop)
-                    for task in tasks:
-                        task.cancel()
-                    loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
-                    loop.run_until_complete(loop.shutdown_asyncgens())
-                    print("\r", end="", flush=True)
-                    logger.info(f"所有服务已停止并登出, 欢迎您再次使用 {__name__.capitalize()}.")
-
-            self.command(*args, **kwargs)(sync_func)
-            return async_func
-
-        return decorator
 
 
 class AsyncTaskPool:
@@ -294,10 +251,10 @@ def random_time(start_time: time = None, end_time: time = None):
 
 def next_random_datetime(start_time: time = None, end_time: time = None, interval_days: int = 1):
     """在特定的开始和结束时间之间生成时间, 并设定最小间隔天数."""
-    min_date = (datetime.now() + timedelta(days=interval_days)).date()
     if interval_days == 0:
         min_datetime = datetime.now()
     else:
+        min_date = (datetime.now() + timedelta(days=interval_days)).date()
         min_datetime = datetime.combine(min_date, time(0, 0))
     target_time = random_time(start_time, end_time)
     offset_date = 0

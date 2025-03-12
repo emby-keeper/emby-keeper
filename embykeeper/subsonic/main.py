@@ -119,14 +119,17 @@ class SubsonicManager:
             time_range = account.time_range or config.emby.time_range
             interval = account.interval_days or config.emby.interval_days
 
-            on_next_time = lambda t: logger.bind(log=True).info(
-                f"下一次 Subsonic 账号 ({account_spec}) 的签到将在 {t.strftime('%m-%d %H:%M %p')} 进行."
-            )
+            # 创建一个函数来生成 on_next_time 回调，确保每个账号都有自己的 account_spec
+            def make_on_next_time(spec):
+                return lambda t: logger.bind(log=True).info(
+                    f"下一次 Subsonic 账号 ({spec}) 的保活将在 {t.strftime('%m-%d %H:%M %p')} 进行."
+                )
+
             scheduler = Scheduler.from_str(
                 func=lambda ctx: self._watch_main([account], False),
                 interval_days=interval,
                 time_range=time_range,
-                on_next_time=on_next_time,
+                on_next_time=make_on_next_time(account_spec),  # 使用工厂函数创建回调
                 sid=f"subsonic.watch.{account_spec}",
                 description=f"Subsonic 保活任务 - {account_spec}",
             )
