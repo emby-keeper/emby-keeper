@@ -129,6 +129,7 @@ docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper -
   - 电子书库 (`epub`): [频道](https://t.me/bookhsulife) [群组](https://t.me/libhsulife) [机器人](https://t.me/wenjian_emby_bot)
   - Kiku (`kiku`): [频道](https://t.me/KikuEmbyNotice) [群组](https://t.me/KikuEmbyChat) [机器人](https://t.me/kikuemby_bot)
   - 叶子 (`yezi`): [频道](https://t.me/yezi_emby) [群组](https://t.me/yeziemby) [机器人]([@](https://t.me/yeziemby_bot)
+  - Lemby_Premium (`lemby`): [频道](https://t.me/Lemby_Channel) [群组](https://t.me/Lemby_Group) [机器人](https://t.me/LembyPremium_BOT)
 
   <!-- #endregion checkiner-sites -->
 
