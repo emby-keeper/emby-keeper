@@ -123,7 +123,7 @@ class Messager:
         self.me = me
         self.min_interval = config.get("min_interval", config.get("interval", self.min_interval or 60))
         self.max_interval = config.get("max_interval", self.max_interval)
-        self.at = config.get("max_interval", self.at)
+        self.at = config.get("at", self.at)
         self.possibility = config.get("possibility", self.possibility)
         self.only = config.get("only", self.only)
         self.log = logger.bind(scheme="telemessager", name=self.name, username=me.full_name)
