@@ -9,16 +9,16 @@ from pyrogram.types import Message, User, Chat
 from pyrogram.enums import ChatMemberStatus, MessageServiceType, MessageEntityType
 from pyrogram.errors import BadRequest
 
-from ..lock import pornemby_alert, pornemby_messager_mids
+from ..lock import pornfans_alert, pornfans_messager_mids
 from . import Monitor
 
 __ignore__ = True
 
 
-class PornembyAlertMonitor(Monitor):
-    name = "Pornemby 风险急停监控"
-    chat_name = ["embytestflight", "Pornemby"]
-    additional_auth = ["pornemby_pack"]
+class PornfansAlertMonitor(Monitor):
+    name = "PornFans 风险急停监控"
+    chat_name = ["embytestflight", "PornFans_Chat"]
+    additional_auth = ["pornfans_pack"]
     allow_edit = True
     debug_no_log = True
     trigger_interval = 0
@@ -69,14 +69,14 @@ class PornembyAlertMonitor(Monitor):
         while True:
             await self.lock.acquire()
             while self.alert_remaining > 0:
-                pornemby_alert[self.client.me.id] = True
+                pornfans_alert[self.client.me.id] = True
                 t = datetime.now()
                 self.lock.release()
                 await asyncio.sleep(1)
                 await self.lock.acquire()
                 self.alert_remaining -= (datetime.now() - t).total_seconds()
             else:
-                pornemby_alert[self.client.me.id] = False
+                pornfans_alert[self.client.me.id] = False
             self.lock.release()
             await asyncio.sleep(1)
 
@@ -86,14 +86,14 @@ class PornembyAlertMonitor(Monitor):
                 if self.alert_remaining > time:
                     return
                 else:
-                    msg = f"Pornemby 风险急停被触发, 停止操作 {time} 秒"
+                    msg = f"PornFans 风险急停被触发, 停止操作 {time} 秒"
                     if reason:
                         msg += f" (原因: {reason})"
                     msg += "."
                     self.log.warning(msg)
                     self.alert_remaining = time
         else:
-            msg = "Pornemby 风险急停被触发, 所有操作永久停止"
+            msg = "PornFans 风险急停被触发, 所有操作永久停止"
             if reason:
                 msg += f" (原因: {reason})"
             msg += "."
@@ -104,12 +104,12 @@ class PornembyAlertMonitor(Monitor):
     async def on_trigger(self, message: Message, key, reply):
         # 管理员回复水群消息, 永久停止, 若存在关键词即回复
         # 用户回复水群消息, 停止 3600 秒, 若存在关键词即回复
-        if message.reply_to_message_id and message.reply_to_message_id in pornemby_messager_mids.get(
+        if message.reply_to_message_id and message.reply_to_message_id in pornfans_messager_mids.get(
             self.client.me.id, []
         ):
             if await self.check_admin(message.chat, message.from_user):
                 await self.set_alert(reason="管理员回复了水群消息")
-                self.log.bind(msg=True).warning("Pornemby 管理员回复了您的自动水群消息, 已急停, 请查看.")
+                self.log.bind(msg=True).warning("PornFans 管理员回复了您的自动水群消息, 已急停, 请查看.")
             else:
                 await self.set_alert(3600, reason="非管理员回复了水群消息")
             if self.check_keyword(message, self.alert_reply_keywords):
@@ -121,7 +121,7 @@ class PornembyAlertMonitor(Monitor):
                         await message.reply(random.choice(self.reply_words))
                         self.last_reply = datetime.now()
                         self.log.bind(msg=True).warning(
-                            "Pornemby 群中有人回复了您的自动水群消息, 已回复, 请查看."
+                            "PornFans 群中有人回复了您的自动水群消息, 已回复, 请查看."
                         )
             return
 
@@ -137,7 +137,7 @@ class PornembyAlertMonitor(Monitor):
                     if await self.check_admin(message.chat, message.from_user):
                         await self.set_alert(reason="管理员 @ 了当前用户")
                         self.log.bind(msg=True).warning(
-                            "Pornemby 管理员回复了您的自动水群消息, 已急停, 请查看."
+                            "PornFans 管理员回复了您的自动水群消息, 已急停, 请查看."
                         )
                     else:
                         await self.set_alert(3600, reason="非管理员 @ 了当前用户")

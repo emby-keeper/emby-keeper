@@ -12,36 +12,29 @@ import numpy as np
 from embykeeper.config import config
 from embykeeper.utils import show_exception, get_proxy_str
 
-from ..lock import pornemby_alert
+from ..lock import pornfans_alert
 from . import Monitor
 
 JAVDATABASE_URL = "https://www.javdatabase.com"
 
 
-class _PornembyExamResultMonitor(Monitor):
-    name = "Pornemby 科举答案"
+class _PornfansExamResultMonitor(Monitor):
+    name = "PornFans 科举答案"
     chat_keyword = r"问题\d*：(.*?)\n+答案为：([ABCD])\n+([A-Z-\d]+)"
-    additional_auth = ["pornemby_pack"]
+    additional_auth = ["pornfans_pack"]
     allow_edit = True
 
     async def on_trigger(self, message: Message, key, reply):
         self.log.info(f"本题正确答案为 {key[1]} ({key[2]}).")
 
 
-class _PornembyExamAnswerMonitor(Monitor):
-    name = "Pornemby 科举"
-    chat_user = [
-        "pornemby_question_bot",
-        "PronembyTGBot2_bot",
-        "PronembyTGBot3_bot",
-        "PornembyBot",
-        "Porn_Emby_Bot",
-        "Porn_Emby_Scriptbot",
-    ]
+class _PornfansExamAnswerMonitor(Monitor):
+    name = "PornFans 科举"
+    chat_user = ["Porn_Emby_Bot", "Porn_emby_ScriptsBot"]
     chat_keyword = (
         r"问题\d*：根据以上封面图，猜猜是什么番号？\n+A:(.*)\n+B:(.*)\n+C:(.*)\n+D:(.*)\n(?!\n*答案)"
     )
-    additional_auth = ["pornemby_pack"]
+    additional_auth = ["pornfans_pack"]
     allow_edit = True
 
     key_map = {
@@ -260,7 +253,7 @@ class _PornembyExamAnswerMonitor(Monitor):
     async def on_trigger(self, message: Message, key, reply):
         if not message.photo or not message.reply_markup:
             return
-        if pornemby_alert.get(self.client.me.id, False):
+        if pornfans_alert.get(self.client.me.id, False):
             self.log.info(f"由于风险急停不作答.")
             return
         if random.random() > self.config.get("possibility", 1.0):
@@ -310,9 +303,9 @@ class _PornembyExamAnswerMonitor(Monitor):
             self.log.warning("未找到匹配的封面图片")
 
 
-class PornembyExamMonitor:
-    class PornembyExamResultMonitor(_PornembyExamResultMonitor):
-        chat_name = ["embytestflight", "Pornemby"]
+class PornfansExamMonitor:
+    class PornfansExamResultMonitor(_PornfansExamResultMonitor):
+        chat_name = ["embytestflight", "PornFans_Chat"]
 
-    class PornembyExamAnswerMonitor(_PornembyExamAnswerMonitor):
-        chat_name = ["embytestflight", "Pornemby"]
+    class PornfansExamAnswerMonitor(_PornfansExamAnswerMonitor):
+        chat_name = ["embytestflight", "PornFans_Chat"]

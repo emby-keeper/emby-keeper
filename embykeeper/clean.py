@@ -20,7 +20,7 @@ def get_cache_options():
         "7": {
             "name": "其他缓存",
             "children": {
-                "7.1": {"name": "monitor.pornemby.answer.qa", "prefix": "monitor.pornemby.answer.qa"}
+                "7.1": {"name": "monitor.pornfans.answer.qa", "prefix": "monitor.pornfans.answer.qa"}
             },
         },
         "8": {"name": "所有缓存", "special": "all"},

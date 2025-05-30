@@ -309,10 +309,10 @@ class Link:
         else:
             return None, None
 
-    async def pornemby_answer(self, question: str) -> Tuple[Optional[str], Optional[str]]:
+    async def pornfans_answer(self, question: str) -> Tuple[Optional[str], Optional[str]]:
         """向机器人发送问题回答请求."""
         results = await self.post(
-            f"/pornemby_answer {self.instance} {question}", timeout=20, name="请求问题回答"
+            f"/pornfans_answer {self.instance} {question}", timeout=20, name="请求问题回答"
         )
         if results:
             return results.get("answer", None), results.get("by", None)

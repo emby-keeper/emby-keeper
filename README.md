@@ -143,9 +143,9 @@ docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper -
   - 测试中新签到器 (默认禁用, 请参考[教程文档](https://emby-keeper.github.io/guide/配置文件#service-子项)启用):
     <!-- #region checkiner-beta-sites -->
 
-    - Pornemby: [频道](https://t.me/pornembyservice) [群组](https://t.me/Pornemby) [机器人](https://t.me/Porn_Emby_Bot)
-      - 签到群自动发言打卡 (`pornemby_group`): [签到群](https://t.me/PornFans_Chat)
-      - 游戏群自动发言打卡 (`pornemby_game_group`): [游戏群](https://t.me/embytestflight)
+    - PornFans: [频道](https://t.me/PornFansChannel) [群组](https://t.me/PornFans_Chat) [机器人](https://t.me/Porn_Emby_Bot)
+      - 签到群自动发言打卡 (`pornfans_group`): [签到群](https://t.me/PornFans_Chat)
+      - 游戏群自动发言打卡 (`pornfans_game_group`): [游戏群](https://t.me/embytestflight)
     - Temby (`temby`): [频道](https://t.me/tembychannel) [群组](https://t.me/tembygroup) [机器人](https://t.me/HiEmbyBot)
     - Temby 测试服 (`temby_beta`): [群组](https://t.me/tembybeta) [机器人](https://t.me/Temby_Bot)
     - Ciji (`ciji`): [机器人](https://t.me/MM_nastool_bot)
@@ -229,14 +229,14 @@ docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper -
 - **Telegram 自动监控信息**
   <!-- #region monitor-sites -->
 
-  - Pornemby:
-    - 问题回答 (`pornemby_answer`): [群组](https://t.me/embytestflight)
-    - 科举考试 (`pornemby_exam`): [群组](https://t.me/embytestflight)
-    - 自动抢注 (`pornemby_register`): [群组](https://t.me/embytestflight)
-    - 自动抢红包雨 (`pornemby_dragon_rain`): [群组](https://t.me/embytestflight)
-    - 自动翻倍 (`pornemby_double`): [群组](https://t.me/embytestflight)
-    - 无 HP 自动停止自动水群 (`pornemby_nohp`): [群组](https://t.me/embytestflight)
-    - 风险时期自动停止 (`pornemby_alert`): [群组](https://t.me/Pornemby)
+  - PornFans:
+    - 问题回答 (`pornfans_answer`): [群组](https://t.me/embytestflight)
+    - 科举考试 (`pornfans_exam`): [群组](https://t.me/embytestflight)
+    - 自动抢注 (`pornfans_register`): [群组](https://t.me/embytestflight)
+    - 自动抢红包雨 (`pornfans_dragon_rain`): [群组](https://t.me/embytestflight)
+    - 自动翻倍 (`pornfans_double`): [群组](https://t.me/embytestflight)
+    - 无 HP 自动停止自动水群 (`pornfans_nohp`): [群组](https://t.me/embytestflight)
+    - 风险时期自动停止 (`pornfans_alert`): [群组](https://t.me/embytestflight)
   - 不给看 抢邀请码 (`bgk`): [群组](https://t.me/Ephemeralemby) [机器人](https://t.me/UnknownEmbyBot)
   - 叔服 抢邀请码 (`shufu`): [群组](http://t.me/+4eq37Ip8ayRhNDI9) [机器人](https://t.me/dashu660_bot)
   - Misty 开注自动注册 (`misty`): [频道](https://t.me/FreeEmbyChannel) [群组](https://t.me/FreeEmby) [机器人](https://t.me/EmbyMistyBot)
@@ -271,9 +271,9 @@ docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper -
 
     - Marmot (`marmot`) (周末早晚签到): [频道](https://t.me/Marmot_Emby_Channel) 群组 (非公开) [机器人](https://t.me/Marmot_Emby_Account_BOT)
 
-    - Pornemby (`pornemby`) (打怪兽水群): [频道](https://t.me/pornembyservice) [群组](https://t.me/Pornemby) [机器人](https://t.me/PronembyTGBot2_bot)
+    - PornFans (`pornfans`) (打怪兽水群): [频道](https://t.me/PornFansChannel) [群组](https://t.me/embytestflight) [机器人](https://t.me/Porn_Emby_Bot)
 
-    - Pornemby 智能化回答 (`smart_pornemby`) (打怪兽水群, AI 会考虑上下文和群组语言风格进行回答): [频道](https://t.me/pornembyservice) [群组](https://t.me/Pornemby) [机器人](https://t.me/PronembyTGBot2_bot)
+    - PornFans 智能化回答 (`smart_pornfans`) (打怪兽水群, AI 会考虑上下文和群组语言风格进行回答): [频道](https://t.me/PornFansChannel) [群组](https://t.me/embytestflight) [机器人](https://t.me/Porn_Emby_Bot)
 
     <!-- #endregion messager-beta-sites -->
   - 关服或无响应 (默认禁用, 请参考[教程文档](https://emby-keeper.github.io/guide/配置文件#service-子项)启用):

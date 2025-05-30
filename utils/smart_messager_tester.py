@@ -12,7 +12,7 @@ import openai
 from pyrogram.types import Message
 
 from embykeeper import __name__ as __product__
-from embykeeper.telegram.messager.smart_pornemby import SmartPornembyMessager
+from embykeeper.telegram.messager.smart_pornfans import SmartPornfansMessager
 from embykeeper.telegram.session import ClientsSession
 from embykeeper.cli import AsyncTyper, get_proxy_str, truncate_str
 from embykeeper.config import config
@@ -36,7 +36,7 @@ async def main(config_file: Path):
     )
     async with ClientsSession(config.telegram.account[:1]) as clients:
         async for a, tg in clients:
-            messager = SmartPornembyMessager(
+            messager = SmartPornfansMessager(
                 {}, config={}, me=tg.me, basedir=Path(user_data_dir(__product__))
             )
             messages_file = await messager.get_spec_path(messager.style_message_list)

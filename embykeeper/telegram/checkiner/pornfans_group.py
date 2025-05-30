@@ -10,43 +10,43 @@ from pyrogram.enums import MessageEntityType
 from embykeeper.runinfo import RunStatus
 
 from ..messager._smart import SmartMessager
-from ..lock import pornemby_alert, pornemby_messager_mids_lock, pornemby_messager_mids
+from ..lock import pornfans_alert, pornfans_messager_mids_lock, pornfans_messager_mids
 from . import BotCheckin
 
 __ignore__ = True
 
 
-class SmartPornembyCheckinMessager(SmartMessager):
-    name = "Pornemby 签到群发言"
+class SmartPornfansCheckinMessager(SmartMessager):
+    name = "PornFans 签到群发言"
     chat_name = "PornFans_Chat"
-    default_messages = "pornemby-checkin-wl@latest.yaml"
-    additional_auth = ["pornemby_pack"]
+    default_messages = "pornfans-checkin-wl@latest.yaml"
+    additional_auth = ["pornfans_pack"]
     msg_per_day = 1
     force_day = True
     at = [time(6, 0), time(23, 59)]
     extra_prompt = "输出内容必须大于 8 个字符, 包括符号"
 
     async def init(self):
-        async with pornemby_messager_mids_lock:
-            if self.me.id not in pornemby_messager_mids:
-                pornemby_messager_mids[self.me.id] = []
+        async with pornfans_messager_mids_lock:
+            if self.me.id not in pornfans_messager_mids:
+                pornfans_messager_mids[self.me.id] = []
         return True
 
     async def send(self, dummy=False):
-        if pornemby_alert.get(self.me.id, False):
+        if pornfans_alert.get(self.me.id, False):
             self.log.info(f"由于风险急停取消发送.")
             return
         message = await super().send(dummy=dummy)
         if message:
-            pornemby_messager_mids[self.me.id].append(message)
+            pornfans_messager_mids[self.me.id].append(message)
         return message
 
 
-class PornembyGroupCheckin(BotCheckin):
-    name = "Pornemby 主群发言"
+class PornfansGroupCheckin(BotCheckin):
+    name = "PornFans 主群发言"
     bot_username = "Porn_Emby_Bot"
-    chat_name = "Pornemby"
-    additional_auth = ["pornemby_pack"]
+    chat_name = "PornFans_Chat"
+    additional_auth = ["pornfans_pack"]
     bot_use_captcha = False
 
     @asynccontextmanager
@@ -72,7 +72,7 @@ class PornembyGroupCheckin(BotCheckin):
                 self.log.info(f"今日已经签到过了.")
                 return await self.finish(RunStatus.NONEED, "今日已签到")
 
-        messager = SmartPornembyCheckinMessager(
+        messager = SmartPornfansCheckinMessager(
             self.client, config={"extra_prompt": "请注意: 回复中必须含有签到两个字, 且长度大于8个字!"}
         )
 

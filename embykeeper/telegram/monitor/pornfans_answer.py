@@ -10,18 +10,18 @@ from embykeeper.utils import to_iterable, truncate_str
 from embykeeper.cache import cache
 
 from ..link import Link
-from ..lock import pornemby_alert
+from ..lock import pornfans_alert
 from . import Monitor
 
 
-QA_CACHE_KEY = "monitor.pornemby.answer.qa"
+QA_CACHE_KEY = "monitor.pornfans.answer.qa"
 
 
-class _PornembyAnswerResultMonitor(Monitor):
-    name = "Pornemby 问题答案"
+class _PornfansAnswerResultMonitor(Monitor):
+    name = "PornFans 问题答案"
     chat_except_keyword = "猜猜是什么番号"
     chat_keyword = r"问题\d*：(.*?)\n+A:(.*)\n+B:(.*)\n+C:(.*)\n+D:(.*)\n+答案为：([ABCD])"
-    additional_auth = ["pornemby_pack"]
+    additional_auth = ["pornfans_pack"]
     allow_edit = True
     allow_caption = False
 
@@ -32,20 +32,13 @@ class _PornembyAnswerResultMonitor(Monitor):
         self.log.info(f"本题正确答案为 {key[5]} ({key[self.key_map[key[5]]]}): {spec}.")
 
 
-class _PornembyAnswerAnswerMonitor(Monitor):
-    name = "Pornemby 问题回答"
-    history_chat_name = ["embytestflight", "Pornemby"]
-    chat_user = [
-        "pornemby_question_bot",
-        "PronembyTGBot2_bot",
-        "PronembyTGBot3_bot",
-        "PornembyBot",
-        "Porn_Emby_Bot",
-        "Porn_Emby_Scriptbot",
-    ]
+class _PornfansAnswerAnswerMonitor(Monitor):
+    name = "PornFans 问题回答"
+    history_chat_name = ["embytestflight", "PornFans_Chat"]
+    chat_user = ["Porn_Emby_Bot", "Porn_emby_ScriptsBot"]
     chat_except_keyword = "猜猜是什么番号"
     chat_keyword = r"问题\d*：(.*?)(\(.*第\d+题.*\))\n+(A:.*\n+B:.*\n+C:.*\n+D:.*)\n(?!\n*答案)"
-    additional_auth = ["pornemby_pack"]
+    additional_auth = ["pornfans_pack"]
 
     lock = asyncio.Lock()
 
@@ -65,7 +58,7 @@ class _PornembyAnswerAnswerMonitor(Monitor):
             to_date = datetime.fromtimestamp(cache.get(f"{QA_CACHE_KEY}.timestamp", 0))
 
         if not to_date:
-            self.log.info("首次使用 Pornemby 科举, 正在缓存问题答案历史.")
+            self.log.info("首次使用 PornFans 问题回答, 正在缓存问题答案历史.")
         else:
             self.log.info(f"正在更新问题答案历史缓存.")
             self.log.debug(f"上一次问题答案历史写入于 {to_date.strftime('%Y-%m-%d %H:%M')}.")
@@ -83,7 +76,7 @@ class _PornembyAnswerAnswerMonitor(Monitor):
                     count += 1
                     finished = False
                     if m.text:
-                        for key in _PornembyAnswerResultMonitor.keys(_PornembyAnswerResultMonitor, m):
+                        for key in _PornfansAnswerResultMonitor.keys(_PornfansAnswerResultMonitor, m):
                             qs += 1
                             cache.set(f"{QA_CACHE_KEY}.data.{key[0]}", key[5])
             if count and (finished or count % 500 == 0):
@@ -119,7 +112,7 @@ class _PornembyAnswerAnswerMonitor(Monitor):
 
     async def on_trigger(self, message: Message, key, reply):
         spec = f"[gray50]({truncate_str(key[0], 10)})[/]"
-        if pornemby_alert.get(self.client.me.id, False):
+        if pornfans_alert.get(self.client.me.id, False):
             self.log.info(f"由于风险急停不作答: {spec}.")
             return
         if random.random() > self.config.get("possibility", 1.0):
@@ -137,7 +130,7 @@ class _PornembyAnswerAnswerMonitor(Monitor):
             question = re.sub(r"\([^\)]*From资料库:第\d+题\)", "", question)
             for _ in range(3):
                 self.log.debug(f"未从历史缓存找到问题, 开始请求云端问题回答: {spec}.")
-                result, by = await Link(self.client).pornemby_answer(question + "\n" + choices)
+                result, by = await Link(self.client).pornfans_answer(question + "\n" + choices)
                 if result:
                     self.log.info(f"请求 {by or '云端'} 问题回答为 {result}: {spec}.")
                     break
@@ -165,9 +158,9 @@ class _PornembyAnswerAnswerMonitor(Monitor):
             self.log.info(f"点击失败: 问题已失效.")
 
 
-class PornembyAnswerMonitor:
-    class PornembyAnswerResultMonitor(_PornembyAnswerResultMonitor):
-        chat_name = ["embytestflight", "Pornemby"]
+class PornfansAnswerMonitor:
+    class PornfansAnswerResultMonitor(_PornfansAnswerResultMonitor):
+        chat_name = ["embytestflight", "PornFans_Chat"]
 
-    class PornembyAnswerAnswerMonitor(_PornembyAnswerAnswerMonitor):
-        chat_name = ["embytestflight", "Pornemby"]
+    class PornfansAnswerAnswerMonitor(_PornfansAnswerAnswerMonitor):
+        chat_name = ["embytestflight", "PornFans_Chat"]

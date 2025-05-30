@@ -138,19 +138,19 @@ messager = false
 # [site]
 # checkiner = ["-terminus", "-temby"]
 # monitor = ["-misty"]
-# messager = ["pornemby"]
+# messager = ["pornfans"]
 
 # 默认启用站点:
 # [site]
 # checkiner = ["apoppro", "awatv", "cc", "dpeak_old", "dvfilm", "epub", "feiyue", "feiyuedpx", "future", "ikunmusic", "jingzhe", "jsq", "july", "kiku", "lemby", "lily", "lyrebird", "meow", "micu", "misty", "mjj", "mooncake", "moyunge", "nangua", "nebula", "pandatv", "pandatv_group", "peach", "pilipili", "plumber", "saturday", "sfcju", "shufu", "tanhua", "tdck", "tdck_new", "terminus", "tiannanus", "watermelon", "worldline", "xigua", "yezi", "yezigm", "yomo", "zm"]
-# monitor = ["bgk", "future", "infinity_fly", "misty", "pornemby_answer", "pornemby_double", "pornemby_dragon_rain", "pornemby_exam", "pornemby_nohp", "viper", "woke"]
+# monitor = ["bgk", "future", "infinity_fly", "misty", "pornfans_answer", "pornfans_double", "pornfans_dragon_rain", "pornfans_exam", "pornfans_nohp", "viper", "woke"]
 # messager = []
 
 # 全部可用站点:
 # [site]
-# checkiner = ["agentsgk", "aisgk", "aivbi", "akile", "akile_group", "akuai", "alpha", "apop", "apoppro", "ask", "aurora", "awamusic", "awatv", "baidusgk", "bearsgk", "bingdaosgk", "bitsgk", "bluesea", "bostsgk", "bytevirt_group", "carll1sgk", "carll2sgk", "cc", "charon", "charon_old", "chunjiangsgk", "ciji", "datasgk", "dingdangsgk", "dogsgk", "dpeak", "dpeak_old", "dvfilm", "embyhub", "epub", "epub_group", "epub_group_chat", "fanhuasgk", "feiji", "feiyue", "feiyuedpx", "feiyuemusic", "feiyuemusic_group_old", "future", "happy", "hdhive", "heisi", "hka", "huasgk", "ikunmusic", "infsgk", "ingeeksgk", "jinding", "jingzhe", "jms", "jms_iptv", "jms_old", "johnsgk", "jsq", "judog", "july", "kiku", "koisgk", "lemby", "levilde", "lily", "ljyy", "ljyy_old", "lyrebird", "m78", "magic", "marmot_group_old", "mastersgk", "meow", "micu", "minisgk", "misty", "mjj", "mooncake", "moonkk", "moshensgk", "moyunge", "nangua", "navidrome", "nebula", "nebula_old", "niaoge", "oixel", "pandatv", "pandatv_group", "peach", "pilipili", "pingansgk", "plumber", "pornemby_game_group", "pornemby_group", "pornemby_old", "qingfengsgk", "qingmei", "raismusic", "rednosesgk", "saturday", "seedsgk", "sfcju", "shufu", "singularity", "skysink", "sssq", "starcat", "starsgk", "tanhua", "tdck", "tdck_new", "temby", "temby_beta", "temby_old", "terminus", "terminus_old", "theend", "tianmaosgk", "tiannan", "tiannanus", "unionsgk", "watermelon", "worldline", "xigua", "xraysgk", "yezi", "yezigm", "yomo", "youno", "zhihusgk", "zhipian", "zhushousgk", "zm"]
-# monitor = ["bgk", "embyhub", "future", "infinity_fly", "judog", "misty", "polo", "pornemby_alert", "pornemby_answer", "pornemby_double", "pornemby_dragon_rain", "pornemby_exam", "pornemby_nohp", "pornemby_register", "shufu", "terminus_exam", "viper", "woke"]
-# messager = ["marmot", "nakonako", "pornemby", "smart_pornemby"]
+# checkiner = ["agentsgk", "aisgk", "aivbi", "akile", "akile_group", "akuai", "alpha", "apop", "apoppro", "ask", "aurora", "awamusic", "awatv", "baidusgk", "bearsgk", "bingdaosgk", "bitsgk", "bluesea", "bostsgk", "bytevirt_group", "carll1sgk", "carll2sgk", "cc", "charon", "charon_old", "chunjiangsgk", "ciji", "datasgk", "dingdangsgk", "dogsgk", "dpeak", "dpeak_old", "dvfilm", "embyhub", "epub", "epub_group", "epub_group_chat", "fanhuasgk", "feiji", "feiyue", "feiyuedpx", "feiyuemusic", "feiyuemusic_group_old", "future", "happy", "hdhive", "heisi", "hka", "huasgk", "ikunmusic", "infsgk", "ingeeksgk", "jinding", "jingzhe", "jms", "jms_iptv", "jms_old", "johnsgk", "jsq", "judog", "july", "kiku", "koisgk", "lemby", "levilde", "lily", "ljyy", "ljyy_old", "lyrebird", "m78", "magic", "marmot_group_old", "mastersgk", "meow", "micu", "minisgk", "misty", "mjj", "mooncake", "moonkk", "moshensgk", "moyunge", "nangua", "navidrome", "nebula", "nebula_old", "niaoge", "oixel", "pandatv", "pandatv_group", "peach", "pilipili", "pingansgk", "plumber", "pornfans_game_group", "pornfans_group", "pornemby_old", "qingfengsgk", "qingmei", "raismusic", "rednosesgk", "saturday", "seedsgk", "sfcju", "shufu", "singularity", "skysink", "sssq", "starcat", "starsgk", "tanhua", "tdck", "tdck_new", "temby", "temby_beta", "temby_old", "terminus", "terminus_old", "theend", "tianmaosgk", "tiannan", "tiannanus", "unionsgk", "watermelon", "worldline", "xigua", "xraysgk", "yezi", "yezigm", "yomo", "youno", "zhihusgk", "zhipian", "zhushousgk", "zm"]
+# monitor = ["bgk", "embyhub", "future", "infinity_fly", "judog", "misty", "polo", "pornfans_alert", "pornfans_answer", "pornfans_double", "pornfans_dragon_rain", "pornfans_exam", "pornfans_nohp", "pornfans_register", "shufu", "terminus_exam", "viper", "woke"]
+# messager = ["marmot", "nakonako", "pornfans", "smart_pornfans"]
 
 # ================================================================================
 # 代理相关设置

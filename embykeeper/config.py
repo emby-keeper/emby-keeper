@@ -359,7 +359,7 @@ class ConfigManager(ProxyBase):
                 "site": {
                     "checkiner": ["-terminus", "-temby"],
                     "monitor": ["-misty"],
-                    "messager": ["pornemby"],
+                    "messager": ["pornfans"],
                 }
             }
         )

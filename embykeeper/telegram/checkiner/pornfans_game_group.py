@@ -1,20 +1,20 @@
 import asyncio
 
 from ..link import Link
-from ..lock import pornemby_alert, pornemby_messager_mids_lock, pornemby_messager_mids
+from ..lock import pornfans_alert, pornfans_messager_mids_lock, pornfans_messager_mids
 from . import BotCheckin
 
 __ignore__ = True
 
 
-class PornembyGameGroupCheckin(BotCheckin):
-    name = "Pornemby 游戏群发言"
+class PornfansGameGroupCheckin(BotCheckin):
+    name = "PornFans 游戏群发言"
     chat_name = "embytestflight"
-    additional_auth = ["pornemby_pack"]
+    additional_auth = ["pornfans_pack"]
     bot_use_captcha = False
 
     async def send_checkin(self, retry=False):
-        if pornemby_alert.get(self.client.me.id, False):
+        if pornfans_alert.get(self.client.me.id, False):
             self.log.warning("签到失败: 由于风险急停不进行发言")
             return await self.fail(message="由于风险急停不进行发言")
 
@@ -52,10 +52,10 @@ class PornembyGameGroupCheckin(BotCheckin):
             if not message:
                 await self.fail(message="发送失败")
             else:
-                async with pornemby_messager_mids_lock:
-                    if self.client.me.id not in pornemby_messager_mids:
-                        pornemby_messager_mids[self.me.id] = []
-                pornemby_messager_mids[self.me.id].append(message.id)
+                async with pornfans_messager_mids_lock:
+                    if self.client.me.id not in pornfans_messager_mids:
+                        pornfans_messager_mids[self.me.id] = []
+                pornfans_messager_mids[self.me.id].append(message.id)
                 await self.finish(message="已发送发言")
             return
         else:

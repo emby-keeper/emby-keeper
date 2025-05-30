@@ -8,11 +8,11 @@ ocrs_lock = asyncio.Lock()
 misty_monitors = {}  # uid: MistyMonitor
 misty_locks = {}  # uid: lock
 
-pornemby_nohp = {}  # uid: date
-pornemby_messager_enabled = {}  # uid: bool
-pornemby_alert = {}  # uid: bool
-pornemby_messager_mids = {}  # uid: list(mid)
-pornemby_messager_mids_lock = asyncio.Lock()
+pornfans_nohp = {}  # uid: date
+pornfans_messager_enabled = {}  # uid: bool
+pornfans_alert = {}  # uid: bool
+pornfans_messager_mids = {}  # uid: list(mid)
+pornfans_messager_mids_lock = asyncio.Lock()
 
 super_ad_shown = {}  # uid: bool
 super_ad_shown_lock = asyncio.Lock()
