@@ -81,6 +81,7 @@ class SmartMessager:
             "min_interval", config.get("interval", self.min_interval or 60)
         )  # 两条消息间的最小间隔时间
         self.max_interval = config.get("max_interval", self.max_interval)  # 两条消息间的最大间隔时间
+        self.at = config.get("at", self.at)  # 可发送的时间范围
         self.log = logger.bind(scheme="telemessager", name=self.name, username=self.me.full_name)
         self.timeline: List[int] = []  # 消息计划序列
         self.style_messages = []
