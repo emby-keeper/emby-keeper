@@ -5,4 +5,4 @@ __ignore__ = True
 
 class YounoCheckin(TemplateACheckin):
     name = "Youno"
-    bot_username = "YounoEmby_bot"
+    bot_username = "YounoEmbyAgain_bot"
