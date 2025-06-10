@@ -129,7 +129,7 @@ docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper -
   - 叶子高码 (`yezigm`): [频道](https://t.me/yezi_emby) [群组](https://t.me/yeziemby) [机器人](https://t.me/yezigm_bot)
   - Ask (`ask`): [频道](https://t.me/ask_uni) [群组](https://t.me/Ask_Universal) [机器人](https://t.me/askUniversal_bot)
   - DPeak (`dpeak`): [群组](https://t.me/EMBY_DPeak) [机器人](https://t.me/emby_dpeak_bot)
-  - Youno (`youno`): [频道](http://t.me/+jRxdcDjxgpViNDll) [群组](https://t.me/YounosEmby) [机器人](https://t.me/YounoEmby_bot)
+  - Youno (`youno`): [频道](http://t.me/+jRxdcDjxgpViNDll) [群组](https://t.me/YounosEmby) [机器人](https://t.me/YounoEmbyAgain_bot)
   - Lemby (`lemby`): [频道](https://t.me/Lemby_Channel) [群组](https://t.me/Lemby_Group) [机器人](https://t.me/LembyPremium_BOT)
   - 南瓜音乐 (`nangua`): [频道](https://t.me/nanguadd) [群组](https://t.me/nanguade) [机器人](https://t.me/nanguadebot)
   - 西瓜 (`xigua`): [频道](https://t.me/ChilledWatermelon) [群组](https://t.me/ChilledMelonGroup) [机器人](https://t.me/XiguaEmbyBot)
