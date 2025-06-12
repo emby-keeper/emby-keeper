@@ -148,7 +148,7 @@ systemd/install: venv/require
 >       exit 1; \
 >   else \
 >       if [ "$$(id -u)" -eq 0 ]; then \
->           mkdir -p "/etc/systemd/system" && echo " \
+>           mkdir -p "/etc/systemd/system" && echo -e " \
 >           [Unit]\n \
 >           Description=Embykeeper Daemon\n \
 >           After=network.target\n\n \
