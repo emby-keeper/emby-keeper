@@ -628,8 +628,10 @@ class CheckinerManager:
                     waiter.cancel()
                 await asyncio.gather(waiter, return_exceptions=True)
 
-        self._log_batch_summary(state.batch_results, log)
+        finish_status, finish_info = self._log_batch_summary(state.batch_results, log)
         state.batch_results.clear()
+        if finish_status is not None and not ctx.end_time:
+            ctx.finish(finish_status, finish_info)
 
     async def _reconcile_running_account(self, state: _AccountState, ctx: RunContext, client: Client, log):
         batch_specs, specs, site_names, _ = self._build_batch_specs(state.account)
@@ -663,7 +665,7 @@ class CheckinerManager:
     @staticmethod
     def _log_batch_summary(results, log):
         if not results:
-            return
+            return None, None
 
         failed = []
         ignored = []
@@ -691,10 +693,13 @@ class CheckinerManager:
             spec += f", {len(ignored)}跳过"
 
         if failed:
-            msg = "签到部分失败" if successful else "签到失败"
+            msg = "签到部分失败" if successful or checked else "签到失败"
             log.bind(log=True).error(f"{msg} ({spec}): {', '.join(failed)}")
+            # Keep FAIL for both total and partial failure; distinguish via status_info.
+            return RunStatus.FAIL, msg
         else:
             log.bind(log=True).info(f"签到成功 ({spec}).")
+            return RunStatus.SUCCESS, "签到成功"
 
     def schedule_site(self, ctx: RunContext, at: datetime, phone: str, site_name: str, reschedule: bool = False):
         state = self._accounts.get(phone)

@@ -1,5 +1,7 @@
+import asyncio
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
 import tomli as tomllib
@@ -35,8 +37,15 @@ class TelegramSettingsPayload(BaseModel):
     registrar_enabled: bool = True
 
 
-def _config_path():
+def _active_config_file():
+    conf_file = getattr(config_manager, "_conf_file", None)
+    if conf_file:
+        return Path(conf_file)
     return config_manager.basedir / "config.toml"
+
+
+def _config_path():
+    return _active_config_file()
 
 
 def _read_config_dict() -> Dict[str, Any]:
@@ -51,10 +60,16 @@ def _write_config_dict(cfg: Dict[str, Any]):
     cfg_path = _config_path()
     with open(cfg_path, "w", encoding="utf-8") as file:
         file.write(tomlkit.dumps(cfg))
+    # 写盘后强制同步 config_manager 内存（watchdog awatch 不总是触发 reload）
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(config_manager.reload_conf(_active_config_file()))
+    except RuntimeError:
+        pass
 
 
 def _load_config() -> Config:
-    cfg_path = config_manager.basedir / "config.toml"
+    cfg_path = _active_config_file()
     return Config(**(tomllib.loads(cfg_path.read_text()) if cfg_path.exists() else {}))
 
 
@@ -90,13 +105,8 @@ def _get_last_checkin_status(phone: str) -> Tuple[Optional[str], Optional[str]]:
         if ctx.status in {RunStatus.PENDING, RunStatus.INITIALIZING, RunStatus.RUNNING, RunStatus.CATAGORY}:
             continue
 
-        if ctx.status_info == "签到部分失败":
-            status = "partial_failed"
-        elif ctx.status_info == "签到失败" or ctx.status in {RunStatus.FAIL, RunStatus.ERROR, RunStatus.CANCELLED}:
-            status = "failed"
-        elif ctx.status_info == "签到成功" or ctx.status == RunStatus.SUCCESS:
-            status = "success"
-        else:
+        status = _infer_checkin_outcome(ctx)
+        if not status:
             continue
 
         run_time = _sort_datetime(ctx.end_time or ctx.start_time)
@@ -105,6 +115,27 @@ def _get_last_checkin_status(phone: str) -> Tuple[Optional[str], Optional[str]]:
             latest_time = run_time
 
     return latest_status, latest_time.isoformat() if latest_time and latest_time != _sort_datetime(None) else None
+
+
+def _infer_checkin_outcome(ctx: RunContext) -> Optional[str]:
+    """Infer account-level checkin outcome from status_info, status, or logs."""
+    if ctx.status_info == "签到部分失败":
+        return "partial_failed"
+    if ctx.status_info == "签到失败" or ctx.status in {RunStatus.FAIL, RunStatus.ERROR, RunStatus.CANCELLED}:
+        return "failed"
+    if ctx.status_info == "签到成功" or ctx.status == RunStatus.SUCCESS:
+        return "success"
+
+    for log in reversed(list(ctx.yield_logs(include_children=False))):
+        message = str(log.message or "")
+        if "签到部分失败" in message:
+            return "partial_failed"
+        if "签到失败" in message:
+            return "failed"
+        if "签到成功" in message:
+            return "success"
+    return None
+
 
 
 def _replace_accounts(raw: Dict[str, Any], accounts: List[TelegramAccount]) -> Dict[str, Any]:
