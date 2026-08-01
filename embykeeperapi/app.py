@@ -1,4 +1,6 @@
 import os
+import errno
+import socket
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 import logging
@@ -20,6 +22,7 @@ from .pm import router as pm_router, pm
 from .proxy import router as proxy_router
 from .sse import router as sse_router
 from .kv_router import router as kv_router
+from .settings_router import router as settings_router
 from .events import register_broadcast_loop, reset_shutdown_event, signal_shutdown, signal_shutdown_async
 
 cli = typer.Typer(help="Embykeeper Panel API server")
@@ -28,6 +31,19 @@ logger = logging.getLogger("uvicorn.error")
 TARGET_HOST_ENV = "EMBYKEEPERAPI_TARGET_HOST"
 TARGET_PORT_ENV = "EMBYKEEPERAPI_TARGET_PORT"
 BACKEND_SHUTDOWN_LOG_GRACE_SECONDS = 0.5
+
+
+def _ensure_bind_available(host: str, port: int) -> None:
+    family = socket.AF_INET6 if ":" in host else socket.AF_INET
+    with socket.socket(family, socket.SOCK_STREAM) as sock:
+        try:
+            sock.bind((host, port))
+        except OSError as exc:
+            if exc.errno == errno.EADDRINUSE:
+                logger.error("Address already in use: %s:%s", host, port)
+            else:
+                logger.error("Unable to bind %s:%s: %s", host, port, exc)
+            raise typer.Exit(1) from exc
 
 
 def _configure_pm_target_from_env() -> None:
@@ -193,6 +209,7 @@ def build_app(allow_origins: List[str] = None) -> FastAPI:
     app.include_router(pm_router, prefix="/api")
     app.include_router(sse_router, prefix="/api")
     app.include_router(kv_router, prefix="/api")
+    app.include_router(settings_router, prefix="/api")
 
     @app.get("/api/panel/health")
     async def panel_health(_: bool = Depends(require_auth)):
@@ -232,6 +249,8 @@ def _run_server(
     cors: List[str] = typer.Option([], help="Add extra CORS origins, repeatable"),
 ):
     """Start panel server via uvicorn and optionally manage backend."""
+    _ensure_bind_available(host, port)
+
     pm.host = target_host
     pm.port = target_port
     os.environ[TARGET_HOST_ENV] = target_host

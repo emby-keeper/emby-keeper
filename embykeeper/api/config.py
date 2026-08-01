@@ -1,4 +1,6 @@
+import asyncio
 from typing import Any, Dict, Optional
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 import tomli as tomllib
@@ -340,8 +342,15 @@ def _save_partial_settings(update: Dict[str, Any], *, drop_proxy: bool = False):
     return {'success': True}
 
 
+def _active_config_file():
+    conf_file = getattr(config_manager, "_conf_file", None)
+    if conf_file:
+        return Path(conf_file)
+    return config_manager.basedir / "config.toml"
+
+
 def _config_path():
-    return (config_manager.basedir / "config.toml")
+    return _active_config_file()
 
 
 def _read_config_dict() -> Dict[str, Any]:
@@ -356,6 +365,12 @@ def _write_config_dict(cfg: Dict[str, Any]):
     cfg_file = _config_path()
     with open(cfg_file, "w", encoding="utf-8") as f:
         f.write(tomlkit.dumps(cfg))
+    # 写盘后强制同步 config_manager 内存（watchdog awatch 不总是触发 reload）
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(config_manager.reload_conf(_active_config_file()))
+    except RuntimeError:
+        pass
 
 
 @router.get("/config")

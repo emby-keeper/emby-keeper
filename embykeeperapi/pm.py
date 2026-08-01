@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from .auth import require_auth
 from .events import broadcast_from_sync
+from .settings import panel_settings
 
 
 class ProcessManager:
@@ -281,10 +282,19 @@ class ProcessManager:
         env = os.environ.copy()
         # Do not pass panel auth to backend; backend API should be open behind proxy
         env.pop("EK_WEBPASS", None)
+
+        panel_settings.reload()
+        backend_basedir = panel_settings.resolved_backend_basedir()
+        backend_config = panel_settings.resolved_backend_config_file()
+        backend_basedir.mkdir(parents=True, exist_ok=True)
+
         args = [
             python,
             "-m",
             "embykeeper",
+            str(backend_config),
+            "--basedir",
+            str(backend_basedir),
             "--api",
             "--api-host",
             self.host,
@@ -339,6 +349,7 @@ class ProcessManager:
 
     def status(self):
         active_pid = self._get_active_pid()
+        panel_settings.reload()
         return {
             "running": active_pid is not None,
             "pid": active_pid,
@@ -348,6 +359,8 @@ class ProcessManager:
             "exit_code": self.exit_code,
             "last_error": self.last_error,
             "recent_output": self._display_output_snapshot(active_pid),
+            "backend_basedir": str(panel_settings.resolved_backend_basedir()),
+            "backend_config_file": str(panel_settings.resolved_backend_config_file()),
         }
 
     def restart(self):

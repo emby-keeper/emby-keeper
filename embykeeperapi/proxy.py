@@ -57,13 +57,14 @@ async def proxy_api(request: Request, path: str, _: bool = Depends(require_auth)
     try:
         if accepts_event_stream:
             client = httpx.AsyncClient(timeout=None, trust_env=False)
-            resp = await client.stream(method, target, params=params, headers=headers, content=content).__aenter__()
+            proxy_request = client.build_request(method, target, params=params, headers=headers, content=content)
+            resp = await client.send(proxy_request, stream=True)
             resp_headers = _filter_headers(dict(resp.headers))
             content_type = resp_headers.get("content-type")
 
             async def gen():
                 try:
-                    async for chunk in resp.aiter_raw():
+                    async for chunk in resp.aiter_bytes():
                         yield chunk
                 except (asyncio.CancelledError, httpx.ReadError):
                     pass
