@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from typing import List, Optional, Set
+from pathlib import Path
 
+import asyncio
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
@@ -147,6 +149,23 @@ def _context_to_dict(ctx: RunContext) -> dict:
     }
 
 
+def _context_log_items(ctx: RunContext) -> List[dict]:
+    items: List[dict] = []
+    for log in ctx.yield_logs(include_children=False):
+        items.append(
+            {
+                "run_id": ctx.id,
+                "parent_ids": ctx.parent_ids or [],
+                "description": ctx.description,
+                "level": log.level,
+                "message": log.message,
+                "time": log.time.isoformat() if log.time else None,
+                "status": ctx.status.name if ctx.status else None,
+            }
+        )
+    return items
+
+
 def _all_run_ids() -> Set[str]:
     ids: Set[str] = set()
     keys = cache.find_by_prefix("runinfo.")
@@ -256,30 +275,32 @@ async def get_logs(
 
         runs.sort(key=lambda x: _sort_datetime(x.start_time), reverse=True)
 
+        seen_log_keys: Set[tuple] = set()
         for run in runs[:limit]:
-            for log in run.yield_logs(include_children=include_children):
-                item = {
-                    "run_id": run.id,
-                    "description": run.description,
-                    "level": log.level,
-                    "message": log.message,
-                    "time": log.time.isoformat() if log.time else None,
-                    "status": run.status.name if run.status else None,
-                }
+            log_contexts = [run]
+            if include_children:
+                log_contexts.extend(run.get_children())
 
-                if level and str(item["level"] or "").upper() != level.upper():
-                    continue
+            for log_ctx in log_contexts:
+                for item in _context_log_items(log_ctx):
+                    log_key = (item["run_id"], item["time"], item["level"], item["message"])
+                    if log_key in seen_log_keys:
+                        continue
+                    seen_log_keys.add(log_key)
 
-                if keyword:
-                    haystack = " ".join([
-                        str(item["message"] or ""),
-                        str(item["description"] or ""),
-                        str(item["run_id"] or ""),
-                    ]).lower()
-                    if keyword.lower() not in haystack:
+                    if level and str(item["level"] or "").upper() != level.upper():
                         continue
 
-                logs.append(item)
+                    if keyword:
+                        haystack = " ".join([
+                            str(item["message"] or ""),
+                            str(item["description"] or ""),
+                            str(item["run_id"] or ""),
+                        ]).lower()
+                        if keyword.lower() not in haystack:
+                            continue
+
+                    logs.append(item)
 
         logs.sort(key=lambda x: x["time"] or "", reverse=True)
         return {"logs": logs[:limit]}
@@ -420,14 +441,12 @@ async def get_run_logs(run_id: str, include_children: bool = True, limit: Option
         if not ctx:
             raise HTTPException(status_code=404, detail="Run not found")
         items: List[dict] = []
-        for log in ctx.yield_logs(include_children=include_children):
-            items.append(
-                {
-                    "level": log.level,
-                    "message": log.message,
-                    "time": log.time.isoformat() if log.time else None,
-                }
-            )
+        log_contexts = [ctx]
+        if include_children:
+            log_contexts.extend(ctx.get_children())
+
+        for log_ctx in log_contexts:
+            items.extend(_context_log_items(log_ctx))
         items.sort(key=lambda x: x["time"] or "", reverse=True)
         if limit is not None and limit > 0:
             items = items[:limit]
@@ -483,3 +502,119 @@ async def clear_cache():
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to clear cache: {e}")
+
+
+def _active_config_file(config_manager) -> Path:
+    conf_file = getattr(config_manager, "_conf_file", None)
+    if conf_file:
+        return Path(conf_file)
+    return config_manager.basedir / "config.toml"
+
+
+async def _trigger_checkin():
+    from ..telegram.checkin_main import CheckinerManager
+    from ..config import config as config_manager
+
+    # 触发前确保 config_manager 与 config.toml 同步，避免读到已删除的账号
+    await config_manager.reload_conf(_active_config_file(config_manager))
+
+    manager = CheckinerManager()
+    ctx = RunContext.prepare(description="立即触发签到")
+    ctx.start(RunStatus.INITIALIZING)
+    accounts = [
+        a for a in (config_manager.telegram.account or []) if a.enabled and a.checkiner
+    ]
+    if not accounts:
+        ctx.finish(RunStatus.NONEED, "没有启用签到的账号")
+        return ctx
+
+    tasks = []
+    for account in accounts:
+        account_ctx = RunContext.prepare(
+            description=f"{account.phone} 账号签到",
+            parent_ids=[ctx.id],
+        )
+        account_ctx.start(RunStatus.RUNNING)
+        task = manager._start_account_task(manager._ensure_state(account), account_ctx, instant=True)
+        if task:
+            tasks.append(task)
+
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    ctx.finish(RunStatus.SUCCESS, "签到任务已触发")
+    return ctx
+
+
+async def _trigger_emby_keepalive():
+    from ..emby.main import EmbyManager
+    from ..config import config as config_manager
+
+    # 触发前确保 config_manager 与 config.toml 同步，避免读到已删除的账号
+    await config_manager.reload_conf(_active_config_file(config_manager))
+
+    manager = EmbyManager()
+    accounts = [
+        a for a in (config_manager.emby.account or []) if a.enabled
+    ]
+    if not accounts:
+        ctx = RunContext.prepare(description="立即触发 Emby 保活")
+        ctx.start(RunStatus.INITIALIZING)
+        ctx.finish(RunStatus.NONEED, "没有启用的 Emby 账号")
+        return ctx
+
+    return await manager._watch_main(accounts, instant=True, description="立即触发 Emby 保活")
+
+
+async def _trigger_subsonic_keepalive():
+    from ..subsonic.main import SubsonicManager
+    from ..config import config as config_manager
+
+    # 触发前确保 config_manager 与 config.toml 同步，避免读到已删除的账号
+    await config_manager.reload_conf(_active_config_file(config_manager))
+
+    manager = SubsonicManager()
+    accounts = [
+        a for a in (config_manager.subsonic.account or []) if a.enabled
+    ]
+    if not accounts:
+        ctx = RunContext.prepare(description="立即触发 Subsonic 保活")
+        ctx.start(RunStatus.INITIALIZING)
+        ctx.finish(RunStatus.NONEED, "没有启用的 Subsonic 账号")
+        return ctx
+
+    return await manager.run_all(instant=True)
+
+
+@router.post("/runinfo/trigger")
+async def trigger_immediate(
+    type: str = Query("all", description="触发类型: checkin, emby, subsonic, all"),
+):
+    try:
+        valid_types = {"checkin", "emby", "subsonic", "all"}
+        if type not in valid_types:
+            raise HTTPException(status_code=400, detail=f"Invalid type: {type}. Must be one of {valid_types}")
+
+        run_ids = []
+
+        async def _run_and_collect(coro):
+            ctx = await coro
+            if ctx:
+                run_ids.append(ctx.id)
+
+        tasks = []
+        if type in ("checkin", "all"):
+            tasks.append(_run_and_collect(_trigger_checkin()))
+        if type in ("emby", "all"):
+            tasks.append(_run_and_collect(_trigger_emby_keepalive()))
+        if type in ("subsonic", "all"):
+            tasks.append(_run_and_collect(_trigger_subsonic_keepalive()))
+
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+        return {"success": True, "run_ids": run_ids}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to trigger: {e}")
