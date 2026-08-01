@@ -9,6 +9,7 @@ from urllib.parse import parse_qs, urlparse
 from loguru import logger
 
 from embykeeper.config import config
+from embykeeper.cache import cache
 from embykeeper.runinfo import RunContext, RunStatus
 from embykeeper.schedule import Scheduler
 from embykeeper.schema import EmbyAccount
@@ -32,6 +33,19 @@ class EmbyManager:
         config.on_change("emby.time_range", self._handle_schedule_change)
         config.on_change("emby.interval_days", self._handle_schedule_change)
         config.on_change("emby.concurrency", self._handle_runtime_config_change)
+
+    @staticmethod
+    def _record_watch_result(account: EmbyAccount, success: bool):
+        """Persist per-account keepalive outcome for the daily overview."""
+        key = f"emby.account_history.{account.url.host}.{account.username}"
+        history = cache.get(key, []) or []
+        if not isinstance(history, list):
+            history = []
+        history.insert(
+            0,
+            {"status": "success" if success else "failed", "time": datetime.now().isoformat()},
+        )
+        cache.set(key, history[:30])
 
     def _module_enabled(self):
         return bool(config.emby.enabled) if config.emby else True
@@ -392,6 +406,7 @@ class EmbyManager:
         successful_accounts = []
         results = await asyncio.gather(*tasks)
         for account, success in results:
+            self._record_watch_result(account, success)
             if success:
                 successful_accounts.append(self.get_spec(account))
             else:

@@ -1,6 +1,7 @@
 import asyncio
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple
+from pathlib import Path
 from urllib.parse import urlparse
 from uuid import uuid4
 
@@ -20,7 +21,7 @@ from ..emby.main import EmbyManager
 
 router = APIRouter()
 
-EMBY_ACCOUNT_HISTORY_LIMIT = 2
+EMBY_ACCOUNT_HISTORY_LIMIT = 30
 EMBY_ACCOUNT_RUN_HISTORY_LIMIT = 20
 
 
@@ -44,8 +45,15 @@ class EmbySettingsPayload(BaseModel):
     enabled: bool = True
 
 
-def _config_path():
+def _active_config_file():
+    conf_file = getattr(config_manager, "_conf_file", None)
+    if conf_file:
+        return Path(conf_file)
     return config_manager.basedir / "config.toml"
+
+
+def _config_path():
+    return _active_config_file()
 
 
 def _read_config_dict() -> Dict[str, Any]:
@@ -60,10 +68,18 @@ def _write_config_dict(cfg: Dict[str, Any]):
     cfg_path = _config_path()
     with open(cfg_path, "w", encoding="utf-8") as file:
         file.write(tomlkit.dumps(cfg))
+    # 写盘后强制同步 config_manager 内存，避免 /runinfo/trigger 等使用 config_manager 的端点
+    # 读到旧账号（依赖 watchdog awatch 触发 reload 不可靠）。
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(config_manager.reload_conf(_active_config_file()))
+    except RuntimeError:
+        # 没有 running loop：watchdog 会兜底
+        pass
 
 
 def _load_config() -> Config:
-    cfg_path = config_manager.basedir / "config.toml"
+    cfg_path = _active_config_file()
     return Config(**(tomllib.loads(cfg_path.read_text()) if cfg_path.exists() else {}))
 
 
@@ -448,12 +464,13 @@ async def start_emby_account_test_run(key: str = Query(...), _: bool = Depends(r
     try:
         account = _find_account_by_key(key)
         description = f"Emby 测试运行 - {_account_spec(account)}"
+        existing_ids = {ctx.id for ctx in RunContext.list_all()}
         task = asyncio.create_task(_run_single_account(account, description=description))
 
         run_id = None
         for _ in range(30):
             for ctx in RunContext.list_all():
-                if ctx.description == description:
+                if ctx.id not in existing_ids and ctx.description == description:
                     run_id = ctx.id
                     break
 

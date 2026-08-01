@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import random
+from datetime import datetime
 from typing import Dict, List, Optional
 from loguru import logger
 
 from embykeeper.config import config
+from embykeeper.cache import cache
 from embykeeper.runinfo import RunContext, RunStatus
 from embykeeper.schedule import Scheduler
 from embykeeper.schema import SubsonicAccount
@@ -19,6 +21,19 @@ logger = logger.bind(scheme="subsonic")
 class SubsonicManager:
     def get_spec(self, a: SubsonicAccount):
         return f"{a.username}@{a.name or a.url.host}"
+
+    @staticmethod
+    def _record_listen_result(account: SubsonicAccount, success: bool):
+        """Persist per-account keepalive outcome for the daily overview."""
+        key = f"subsonic.account_history.{account.url.host}.{account.username}"
+        history = cache.get(key, []) or []
+        if not isinstance(history, list):
+            history = []
+        history.insert(
+            0,
+            {"status": "success" if success else "failed", "time": datetime.now().isoformat()},
+        )
+        cache.set(key, history[:30])
 
     async def _listen_main(self, accounts: List[SubsonicAccount], instant: bool = False):
         if not accounts:
@@ -61,6 +76,7 @@ class SubsonicManager:
         successful_accounts = []
         results = await asyncio.gather(*tasks)
         for a, success in results:
+            self._record_listen_result(a, success)
             if success:
                 successful_accounts.append(self.get_spec(a))
             else:

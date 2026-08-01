@@ -1,4 +1,6 @@
+import asyncio
 from typing import Any, Dict, List, Optional, Set, Tuple
+from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -7,11 +9,14 @@ import tomlkit
 from pydantic import BaseModel, Field, ValidationError
 
 from .auth import require_auth
+from ..cache import cache
 from ..config import config as config_manager
 from ..schema import Config, SubsonicAccount, format_errors
 
 
 router = APIRouter()
+
+SUBSONIC_ACCOUNT_HISTORY_LIMIT = 30
 
 
 class SubsonicAccountPayload(BaseModel):
@@ -30,8 +35,15 @@ class SubsonicSettingsPayload(BaseModel):
     enabled: bool = True
 
 
-def _config_path():
+def _active_config_file():
+    conf_file = getattr(config_manager, "_conf_file", None)
+    if conf_file:
+        return Path(conf_file)
     return config_manager.basedir / "config.toml"
+
+
+def _config_path():
+    return _active_config_file()
 
 
 def _read_config_dict() -> Dict[str, Any]:
@@ -46,14 +58,42 @@ def _write_config_dict(cfg: Dict[str, Any]):
     cfg_path = _config_path()
     with open(cfg_path, "w", encoding="utf-8") as file:
         file.write(tomlkit.dumps(cfg))
+    # 写盘后强制同步 config_manager 内存（watchdog awatch 不总是触发 reload）
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(config_manager.reload_conf(_active_config_file()))
+    except RuntimeError:
+        pass
 
 
 def _load_config() -> Config:
-    cfg_path = config_manager.basedir / "config.toml"
+    cfg_path = _active_config_file()
     return Config(**(tomllib.loads(cfg_path.read_text()) if cfg_path.exists() else {}))
 
 
+def _account_history_cache_key(account: SubsonicAccount) -> str:
+    return f"subsonic.account_history.{account.url.host}.{account.username}"
+
+
+def _read_account_history(account: SubsonicAccount) -> List[Dict[str, str]]:
+    raw = cache.get(_account_history_cache_key(account), []) or []
+    records: List[Dict[str, str]] = []
+    if not isinstance(raw, list):
+        return records
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        status = item.get("status")
+        time_value = item.get("time")
+        if status not in {"success", "failed"} or not isinstance(time_value, str):
+            continue
+        records.append({"status": status, "time": time_value})
+    records.sort(key=lambda item: item["time"], reverse=True)
+    return records[:SUBSONIC_ACCOUNT_HISTORY_LIMIT]
+
+
 def _serialize_account(account: SubsonicAccount) -> Dict[str, Any]:
+    watch_history = _read_account_history(account)
     return {
         "id": _account_key(account),
         "url": str(account.url),
@@ -64,6 +104,7 @@ def _serialize_account(account: SubsonicAccount) -> Dict[str, Any]:
         "time": account.time,
         "interval_days": str(account.interval_days) if account.interval_days is not None else None,
         "time_range": account.time_range,
+        "watch_history": watch_history,
     }
 
 
