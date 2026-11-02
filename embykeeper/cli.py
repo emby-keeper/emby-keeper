@@ -6,6 +6,7 @@ from typing import List, Optional
 from functools import wraps
 
 import typer
+from typer.core import TyperCommand
 import asyncio
 from loguru import logger
 from appdirs import user_data_dir
@@ -74,6 +75,16 @@ class AsyncTyper(typer.Typer):
         return decorator
 
 
+class EmbykeeperCommand(TyperCommand):
+    def main(self, args=None, prog_name=None, **kwargs):
+        arguments = list(sys.argv[1:] if args is None else args)
+        if arguments and arguments[0] == "web":
+            from embykeeperapi.app import cli as panel_cli
+
+            return panel_cli(args=arguments[1:], prog_name=f"{prog_name or 'embykeeper'} web", **kwargs)
+        return super().main(args=arguments, prog_name=prog_name, **kwargs)
+
+
 app = AsyncTyper(
     pretty_exceptions_enable=False,
     rich_markup_mode="rich",
@@ -102,6 +113,8 @@ def print_help(ctx: typer.Context, param: typer.CallbackParam, value: bool):
 
 
 @app.async_command(
+    cls=EmbykeeperCommand,
+    epilog="网页管理: embykeeper web",
     help=(
         f"欢迎使用 [orange3]{__product__.capitalize()}[/] {__version__} " ":cinema: 无参数默认开启全部功能."
     )
