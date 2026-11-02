@@ -24,6 +24,23 @@ jobs:
         with:
           python-version: '3.x'
       -
+        name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      -
+        name: Build panel frontend
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.15.9 --activate
+          cd frontend
+          pnpm install --frozen-lockfile
+          pnpm run build
+          cd ..
+          mkdir -p embykeeperapi/static
+          cp -R frontend/dist/. embykeeperapi/static/
+          cp windows/installer-gui/Resources/logo.ico embykeeperapi/static/tray.ico
+      -
         name: Install dependencies
         run: |
           python -m pip install --upgrade pip
