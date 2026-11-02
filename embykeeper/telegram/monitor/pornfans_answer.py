@@ -13,7 +13,6 @@ from ..link import Link
 from ..lock import pornfans_alert
 from . import Monitor
 
-
 QA_CACHE_KEY = "monitor.pornfans.answer.qa"
 
 

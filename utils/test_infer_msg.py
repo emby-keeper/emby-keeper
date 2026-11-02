@@ -8,7 +8,6 @@ from embykeeper.telegram.link import Link
 from embykeeper.cli import AsyncTyper, truncate_str
 from embykeeper.config import config
 
-
 app = AsyncTyper()
 
 

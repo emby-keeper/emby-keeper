@@ -338,7 +338,13 @@ class EmbyManager:
     def get_spec(self, account: EmbyAccount):
         return f"{account.username}@{account.name or account.url.host}"
 
-    async def _watch_main(self, accounts: List[EmbyAccount], instant: bool = False, description: Optional[str] = None, connect_only: bool = False):
+    async def _watch_main(
+        self,
+        accounts: List[EmbyAccount],
+        instant: bool = False,
+        description: Optional[str] = None,
+        connect_only: bool = False,
+    ):
         if not accounts:
             return None
 
@@ -369,22 +375,34 @@ class EmbyManager:
                     if not account.play_id:
                         emby.log.info("正在登陆并获取首页视频项目.")
                         if not emby.user_id and not await emby.login():
-                            emby.log.warning("连接测试失败: 无法登陆." if connect_only else "保活失败: 无法登陆.")
+                            emby.log.warning(
+                                "连接测试失败: 无法登陆." if connect_only else "保活失败: 无法登陆."
+                            )
                             return account, False
                         await emby.load_main_page()
                         if not emby.items:
-                            emby.log.warning("连接测试失败: 无法获取首页中的视频项目" if connect_only else "保活失败: 无法获取首页中的视频项目")
+                            emby.log.warning(
+                                "连接测试失败: 无法获取首页中的视频项目"
+                                if connect_only
+                                else "保活失败: 无法获取首页中的视频项目"
+                            )
                             return account, False
                         emby.log.info(f"成功登陆, 获取了 {len(emby.items)} 个首页视频项目.")
                         await asyncio.sleep(random.uniform(2, 5))
                     else:
                         emby.log.info(f"正在登陆并播放您指定的视频, ID 为 {account.play_id}.")
                         if not emby.user_id and not await emby.login():
-                            emby.log.warning("连接测试失败: 无法登陆." if connect_only else "保活失败: 无法登陆.")
+                            emby.log.warning(
+                                "连接测试失败: 无法登陆." if connect_only else "保活失败: 无法登陆."
+                            )
                             return account, False
                         item = await emby.get_item(account.play_id)
                         if "Id" not in item:
-                            emby.log.warning("连接测试失败: 无法获取视频项目" if connect_only else "保活失败: 无法获取视频项目")
+                            emby.log.warning(
+                                "连接测试失败: 无法获取视频项目"
+                                if connect_only
+                                else "保活失败: 无法获取视频项目"
+                            )
                             return account, False
                         emby.items[item["Id"]] = item
                         emby.log.info("成功登陆, 获取了视频项目.")
@@ -420,13 +438,19 @@ class EmbyManager:
 
         if fails:
             if len(accounts) == 1:
-                run_logger.error(f"{'连接测试失败' if connect_only else '保活失败'}: {', '.join(failed_accounts)}")
+                run_logger.error(
+                    f"{'连接测试失败' if connect_only else '保活失败'}: {', '.join(failed_accounts)}"
+                )
             else:
-                run_logger.error(f"{'连接测试失败' if connect_only else '保活失败'} ({fails}/{len(tasks)}): {', '.join(failed_accounts)}")
+                run_logger.error(
+                    f"{'连接测试失败' if connect_only else '保活失败'} ({fails}/{len(tasks)}): {', '.join(failed_accounts)}"
+                )
             return ctx.finish(RunStatus.FAIL, "连接测试失败" if connect_only else "保活失败")
 
         if len(accounts) == 1:
-            run_logger.bind(log=True).info(f"{'连接测试成功' if connect_only else '保活成功'}: {', '.join(successful_accounts)}.")
+            run_logger.bind(log=True).info(
+                f"{'连接测试成功' if connect_only else '保活成功'}: {', '.join(successful_accounts)}."
+            )
         else:
             run_logger.bind(log=True).info(
                 f"{'连接测试成功' if connect_only else '保活成功'} ({len(tasks)}/{len(tasks)}): {', '.join(successful_accounts)}."

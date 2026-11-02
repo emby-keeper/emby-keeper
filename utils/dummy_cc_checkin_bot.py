@@ -49,13 +49,11 @@ async def dump(client: Client, message: Message):
 
 
 async def start(client: Client, message: Message):
-    content = dedent(
-        """
+    content = dedent("""
     🍉欢迎使用 **Cc** Bot!
 
     📠请在下方选择您要使用的功能!
-    """.strip()
-    )
+    """.strip())
     await client.send_photo(
         message.chat.id,
         main_photo,
@@ -91,14 +89,12 @@ async def callback_yzm(client: Client, callback: CallbackQuery):
     yzm = callback.data.split("_")[1]
     if yzm == states.get(callback.from_user.id, None):
         if signed.get(callback.from_user.id, None):
-            content = dedent(
-                """
+            content = dedent("""
                 您今天已经签到过了
                 ⚖️ 累计签到：1
                 💰 当前积分:1
                 🪙 当前Cc币:1
-                """.strip()
-            )
+                """.strip())
             await client.send_photo(
                 callback.message.chat.id,
                 main_photo,
@@ -108,12 +104,10 @@ async def callback_yzm(client: Client, callback: CallbackQuery):
             )
         else:
             signed[callback.from_user.id] = True
-            content = dedent(
-                """
+            content = dedent("""
                 🎉 签到成功，获得了 1积分
                 💰总积分：1
-                """.strip()
-            )
+                """.strip())
             await client.send_photo(
                 callback.message.chat.id,
                 main_photo,
@@ -122,11 +116,9 @@ async def callback_yzm(client: Client, callback: CallbackQuery):
                 reply_markup=main_reply_markup,
             )
     else:
-        content = dedent(
-            """
+        content = dedent("""
         🎉 签到失败, 验证码错误
-        """.strip()
-        )
+        """.strip())
         await client.send_photo(
             callback.message.chat.id,
             main_photo,

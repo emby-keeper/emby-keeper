@@ -88,7 +88,9 @@ class RujingCheckin(TemplateACheckin):
                     }
                     for i in range(10):
                         try:
-                            async with httpx.AsyncClient(http2=True, proxy=get_telegram_proxy_str()) as client:
+                            async with httpx.AsyncClient(
+                                http2=True, proxy=get_telegram_proxy_str()
+                            ) as client:
                                 resp = await client.post(url_submit, headers=headers, json=data)
                                 result = resp.text
 

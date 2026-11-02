@@ -51,8 +51,7 @@ async def dump(client: Client, message: Message):
 
 async def start(client: Client, message: Message):
     user_id = message.from_user.id
-    content = dedent(
-        f"""
+    content = dedent(f"""
     ▎欢迎进入用户面板！Mem
 
     · 🆔 用户のID | {user_id}
@@ -61,8 +60,7 @@ async def start(client: Client, message: Message):
     · ®️ 注册状态 | False
     · 🎫 总注册限制 | 799
     · 🎟️ 可注册席位 | 17
-    """.strip()
-    )
+    """.strip())
     sent_message = await client.send_photo(
         message.chat.id,
         main_photo,
@@ -123,14 +121,12 @@ async def callback_checkin(client: Client, callback: CallbackQuery):
     await cancel_timer(user_id)
 
     # First show the verification starting message
-    start_content = dedent(
-        """
+    start_content = dedent("""
     🎯 开始签到验证...
 
     系统正在生成验证问题
     请稍等...
-    """.strip()
-    )
+    """.strip())
 
     # Update the original message
     await callback.message.edit_caption(
@@ -148,8 +144,7 @@ async def callback_checkin(client: Client, callback: CallbackQuery):
     result = num1 + num2 + num3
 
     states[user_id] = str(result)
-    question_content = dedent(
-        f"""
+    question_content = dedent(f"""
     🎯 签到验证
 
     · ❓ 验证问题 | {num1} + {num2} + {num3} = ?
@@ -159,8 +154,7 @@ async def callback_checkin(client: Client, callback: CallbackQuery):
       答错：扣除 5-15 BB币
 
     请直接发送答案数字
-    """.strip()
-    )
+    """.strip())
 
     # Edit message to show the actual question
     await callback.message.edit_caption(
@@ -194,27 +188,23 @@ async def result(client: Client, message: Message):
     if answer == correct_answer:
         coins = random.randint(10, 30)
         signed[user_id] = True
-        content = dedent(
-            f"""
+        content = dedent(f"""
         ✅ 签到成功！
 
         · 🎉 获得BB币 | +{coins}
         · 💰 当前BB币 | {coins}
         · ⏰ 签到时间 | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
         · 📅 下次签到 | {(datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')}
-        """.strip()
-        )
+        """.strip())
     else:
         coins = random.randint(5, 15)
-        content = dedent(
-            f"""
+        content = dedent(f"""
         ❌ 回答错误！
 
         · 😢 扣除BB币 | -{coins}
         · 💰 当前BB币 | 0
         · ⏰ 操作时间 | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-        """.strip()
-        )
+        """.strip())
 
     # Update the original message instead of sending a new one
     if user_id in original_messages:

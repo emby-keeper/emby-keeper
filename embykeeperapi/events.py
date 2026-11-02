@@ -78,10 +78,7 @@ class EventBroadcaster:
         dead_queues = []
         for queue in queues:
             try:
-                await asyncio.wait_for(
-                    queue.put({"type": event_type, "data": data}),
-                    timeout=1.0
-                )
+                await asyncio.wait_for(queue.put({"type": event_type, "data": data}), timeout=1.0)
             except Exception as e:
                 logger.warning(f"Failed to send event to subscriber: {e}")
                 dead_queues.append(queue)
@@ -99,10 +96,7 @@ class EventBroadcaster:
 
         for queue in all_queues:
             try:
-                await asyncio.wait_for(
-                    queue.put({"type": event_type, "data": data}),
-                    timeout=1.0
-                )
+                await asyncio.wait_for(queue.put({"type": event_type, "data": data}), timeout=1.0)
             except Exception:
                 pass
 

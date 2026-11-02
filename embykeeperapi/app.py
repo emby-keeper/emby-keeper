@@ -135,8 +135,12 @@ class PanelServer(Server):
                 pm.force_stop(pid)
                 return
 
-            if (not announced_wait) and (time.monotonic() - started_waiting_at >= BACKEND_SHUTDOWN_LOG_GRACE_SECONDS):
-                logger.info("Waiting for managed Embykeeper backend to stop. Press Ctrl+C again to force quit.")
+            if (not announced_wait) and (
+                time.monotonic() - started_waiting_at >= BACKEND_SHUTDOWN_LOG_GRACE_SECONDS
+            ):
+                logger.info(
+                    "Waiting for managed Embykeeper backend to stop. Press Ctrl+C again to force quit."
+                )
                 announced_wait = True
 
             await asyncio.sleep(0.2)
@@ -183,8 +187,12 @@ class PanelReload(ChangeReload):
                 pm.force_stop(pid)
                 return
 
-            if (not announced_wait) and (time.monotonic() - started_waiting_at >= BACKEND_SHUTDOWN_LOG_GRACE_SECONDS):
-                logger.info("Waiting for managed Embykeeper backend to stop. Press Ctrl+C again to force quit.")
+            if (not announced_wait) and (
+                time.monotonic() - started_waiting_at >= BACKEND_SHUTDOWN_LOG_GRACE_SECONDS
+            ):
+                logger.info(
+                    "Waiting for managed Embykeeper backend to stop. Press Ctrl+C again to force quit."
+                )
                 announced_wait = True
 
             time.sleep(0.2)

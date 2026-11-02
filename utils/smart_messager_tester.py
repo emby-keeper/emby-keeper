@@ -17,7 +17,6 @@ from embykeeper.telegram.session import ClientsSession
 from embykeeper.cli import AsyncTyper, get_proxy_str, truncate_str
 from embykeeper.config import config
 
-
 app = AsyncTyper()
 
 # 定义历史消息数量常量

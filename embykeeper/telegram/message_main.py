@@ -132,7 +132,8 @@ class MessageManager:
         restart_phones = {
             phone
             for phone in current_phones & desired_phones
-            if self._account_signature(self._accounts[phone].account) != self._account_signature(desired_accounts[phone])
+            if self._account_signature(self._accounts[phone].account)
+            != self._account_signature(desired_accounts[phone])
         }
 
         await self._stop_accounts((current_phones - desired_phones) | restart_phones)
@@ -256,7 +257,9 @@ class MessageManager:
             config=config.messager.get_site_config(spec.site_name) if config.messager else {},
         )
         task = asyncio.create_task(messager._start(), name=f"messager:{state.account.phone}:{spec.key}")
-        task.add_done_callback(lambda t, phone=state.account.phone, key=spec.key: self._on_site_task_done(phone, key, t))
+        task.add_done_callback(
+            lambda t, phone=state.account.phone, key=spec.key: self._on_site_task_done(phone, key, t)
+        )
         state.site_tasks[spec.key] = task
         return messager.name or spec.site_name
 

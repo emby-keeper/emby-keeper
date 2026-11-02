@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from ..cache import cache
 
-
 router = APIRouter()
 
 

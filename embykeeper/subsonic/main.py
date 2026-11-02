@@ -35,7 +35,13 @@ class SubsonicManager:
         )
         cache.set(key, history[:30])
 
-    async def _listen_main(self, accounts: List[SubsonicAccount], instant: bool = False, description: Optional[str] = None, connect_only: bool = False):
+    async def _listen_main(
+        self,
+        accounts: List[SubsonicAccount],
+        instant: bool = False,
+        description: Optional[str] = None,
+        connect_only: bool = False,
+    ):
         if not accounts:
             return None
         logger.info("开始执行 Subsonic 连接测试." if connect_only else "开始执行 Subsonic 保活.")
@@ -89,12 +95,18 @@ class SubsonicManager:
 
         if fails:
             if len(accounts) == 1:
-                logger.error(f"{'连接测试失败' if connect_only else '保活失败'}: {', '.join(failed_accounts)}")
+                logger.error(
+                    f"{'连接测试失败' if connect_only else '保活失败'}: {', '.join(failed_accounts)}"
+                )
             else:
-                logger.error(f"{'连接测试失败' if connect_only else '保活失败'} ({fails}/{len(tasks)}): {', '.join(failed_accounts)}")
+                logger.error(
+                    f"{'连接测试失败' if connect_only else '保活失败'} ({fails}/{len(tasks)}): {', '.join(failed_accounts)}"
+                )
             return ctx.finish(RunStatus.FAIL, f"连接测试失败" if connect_only else "保活失败")
         if len(accounts) == 1:
-            logger.bind(log=True).info(f"{'连接测试成功' if connect_only else '保活成功'}: {', '.join(successful_accounts)}.")
+            logger.bind(log=True).info(
+                f"{'连接测试成功' if connect_only else '保活成功'}: {', '.join(successful_accounts)}."
+            )
         else:
             logger.bind(log=True).info(
                 f"{'连接测试成功' if connect_only else '保活成功'} ({len(tasks)}/{len(tasks)}): {', '.join(successful_accounts)}."
@@ -302,9 +314,7 @@ class SubsonicManager:
             return None
 
         def on_next_time(t):
-            logger.bind(log=True).info(
-                f"下一次 Subsonic 保活将在 {t.strftime('%m-%d %H:%M %p')} 进行."
-            )
+            logger.bind(log=True).info(f"下一次 Subsonic 保活将在 {t.strftime('%m-%d %H:%M %p')} 进行.")
 
         def func(ctx: RunContext):
             existing = self._tasks.pop("unified", None)

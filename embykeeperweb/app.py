@@ -25,7 +25,6 @@ from flask_socketio import SocketIO
 from flask_login import LoginManager, login_user, login_required, current_user
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-
 try:
     import tomllib
 except ImportError:
@@ -253,7 +252,7 @@ def read_and_forward_pty_output():
             try:
                 with app.config["lock"]:
                     if app.config["fd"]:
-                        (data, _, _) = select.select([app.config["fd"]], [], [], 1.0)
+                        data, _, _ = select.select([app.config["fd"]], [], [], 1.0)
                         if data:
                             output = os.read(app.config["fd"], max_read_bytes).decode(errors="ignore")
                             app.config["hist"] += output

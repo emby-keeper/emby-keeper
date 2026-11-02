@@ -10,7 +10,6 @@ from typing import Any, Dict, Optional
 from appdirs import user_data_dir
 from pydantic import BaseModel, Field, field_validator
 
-
 PRODUCT_NAME = "embykeeper"
 SETTINGS_ENV_PATH = "EMBYKEEPERAPI_SETTINGS_PATH"
 BASEDIR_ENV = "EMBYKEEPERAPI_BASEDIR"

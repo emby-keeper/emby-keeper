@@ -54,15 +54,13 @@ async def start(client: Client, message: Message):
     if message.from_user.id in states:
         del states[message.from_user.id]
 
-    content = dedent(
-        """
+    content = dedent("""
     🍉欢迎使用 Misty Bot!
 
     📠请在下方选择您要使用的功能!
 
     ⚡️有任何问题请先查看 '常见问题'!
-    """.strip()
-    )
+    """.strip())
     await client.send_photo(
         message.chat.id,
         main_photo,
@@ -101,13 +99,11 @@ async def handle_captcha_response(client: Client, message: Message):
     if message.text == states[message.from_user.id]:
         signed[message.from_user.id] = True
         current_time = datetime.now().strftime("%Y-%m-%d")
-        content = dedent(
-            f"""
+        content = dedent(f"""
             🎉签到成功，获得 1 积分！
             ℹ️当前积分：12
             ⏱️签到时间：{current_time}
-            """.strip()
-        )
+            """.strip())
         await client.send_photo(message.chat.id, main_photo, caption=content, parse_mode=ParseMode.MARKDOWN)
         await message.reply("🎯请选择功能:", reply_markup=more_reply_markup)
         del states[message.from_user.id]

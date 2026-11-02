@@ -26,9 +26,9 @@ class WebCommandTests(unittest.TestCase):
     def test_example_password_is_rejected_before_starting_backend(self):
         from embykeeper.cli import app
 
-        with patch.dict("os.environ", {"EK_WEBPASS": "your-password"}), \
-                patch("embykeeperapi.app._ensure_bind_available") as bind, \
-                patch("embykeeperapi.app.pm.start") as start:
+        with patch.dict("os.environ", {"EK_WEBPASS": "your-password"}), patch(
+            "embykeeperapi.app._ensure_bind_available"
+        ) as bind, patch("embykeeperapi.app.pm.start") as start:
             result = CliRunner().invoke(app, ["web"])
         self.assertNotEqual(result.exit_code, 0)
         self.assertIn("your-password", result.output)
@@ -38,11 +38,13 @@ class WebCommandTests(unittest.TestCase):
     def test_other_password_starts_the_server(self):
         from embykeeper.cli import app
 
-        with patch.dict("os.environ", {"EK_WEBPASS": "another-password"}), \
-                patch("embykeeperapi.app._ensure_bind_available"), \
-                patch("embykeeperapi.app.pm.start"), \
-                patch("embykeeperapi.app.pm.owns_backend", return_value=False), \
-                patch("embykeeperapi.app.PanelServer") as server:
+        with patch.dict("os.environ", {"EK_WEBPASS": "another-password"}), patch(
+            "embykeeperapi.app._ensure_bind_available"
+        ), patch("embykeeperapi.app.pm.start"), patch(
+            "embykeeperapi.app.pm.owns_backend", return_value=False
+        ), patch(
+            "embykeeperapi.app.PanelServer"
+        ) as server:
             result = CliRunner().invoke(app, ["web"])
         self.assertEqual(result.exit_code, 0, result.output)
         server.return_value.run.assert_called_once()
@@ -98,8 +100,9 @@ class WebLifespanTests(unittest.IsolatedAsyncioTestCase):
     async def test_example_password_is_rejected_by_asgi_startup(self):
         from embykeeperapi.app import app, lifespan
 
-        with patch.dict("os.environ", {"EK_WEBPASS": "your-password"}), \
-                self.assertRaisesRegex(ValueError, "your-password"):
+        with patch.dict("os.environ", {"EK_WEBPASS": "your-password"}), self.assertRaisesRegex(
+            ValueError, "your-password"
+        ):
             async with lifespan(app):
                 self.fail("the panel should not start")
 
@@ -107,7 +110,10 @@ class WebLifespanTests(unittest.IsolatedAsyncioTestCase):
         env = {**os.environ, "EK_WEBPASS": "your-password"}
         result = subprocess.run(
             [sys.executable, "-m", "embykeeperweb.app"],
-            env=env, capture_output=True, text=True, timeout=30,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("your-password", result.stdout + result.stderr)
@@ -119,8 +125,9 @@ class WindowsPanelTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as directory:
             config = Path(directory) / "data" / "config.toml"
-            with patch("embykeeperapi.settings.panel_settings.resolved_backend_config_file", return_value=config), \
-                    patch("embykeeperapi.app._run_server") as serve:
+            with patch(
+                "embykeeperapi.settings.panel_settings.resolved_backend_config_file", return_value=config
+            ), patch("embykeeperapi.app._run_server") as serve:
                 PanelController()._run()
                 self.assertEqual(config.read_text(), "")
                 self.assertEqual(serve.call_args.kwargs["host"], "127.0.0.1")
@@ -169,8 +176,11 @@ class DockerReleaseTests(unittest.TestCase):
         for filename, target in (("docker.yml", "release"), ("docker-dev.yml", "editable")):
             with self.subTest(workflow=filename):
                 workflow = yaml.safe_load((root / ".github" / "workflows" / filename).read_text())
-                builds = [step["with"] for step in workflow["jobs"]["build"]["steps"]
-                          if step.get("uses", "").startswith("docker/build-push-action@")]
+                builds = [
+                    step["with"]
+                    for step in workflow["jobs"]["build"]["steps"]
+                    if step.get("uses", "").startswith("docker/build-push-action@")
+                ]
                 self.assertTrue(builds)
                 self.assertEqual(workflow["env"]["REGISTRY_IMAGE"], "embykeeper/embykeeper")
                 for build in builds:
@@ -211,8 +221,7 @@ class WindowsReleaseTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         workflow = yaml.safe_load((root / ".github" / "workflows" / "windows.yml").read_text())
         self.assertEqual(set(workflow["jobs"]), {"win-script", "win-validation"})
-        archiving = [step for step in workflow["jobs"]["win-script"]["steps"]
-                     if "zip" in step.get("run", "")]
+        archiving = [step for step in workflow["jobs"]["win-script"]["steps"] if "zip" in step.get("run", "")]
         self.assertTrue(archiving)
         for filename in ("Start-Embykeeper.bat", "install.ps1", "version.txt"):
             self.assertIn(filename, archiving[0]["run"])
@@ -221,7 +230,7 @@ class WindowsReleaseTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         script = (root / "windows" / "installer-script" / "install.ps1").read_text(encoding="utf-8")
         self.assertIn("$pythonVersion = '3.11.9'", script)
-        self.assertIn('-embed-amd64.zip', script)
+        self.assertIn("-embed-amd64.zip", script)
         self.assertIn("https://www.python.org/ftp/python", script)
         self.assertIn("https://registry.npmmirror.com/-/binary/python", script)
         self.assertLess(script.index("pypi.tuna.tsinghua.edu.cn"), script.index("pypi.org/simple"))
@@ -243,7 +252,9 @@ class WindowsReleaseTests(unittest.TestCase):
         launcher = (root / "embykeeper" / "windows_panel.py").read_text(encoding="utf-8")
         self.assertIn("EK_WEBPASS", launcher)
         self.assertIn("127.0.0.1", launcher)
-        self.assertIn("install.ps1", (root / "windows" / "installer-script" / "Start-Embykeeper.bat").read_text())
+        self.assertIn(
+            "install.ps1", (root / "windows" / "installer-script" / "Start-Embykeeper.bat").read_text()
+        )
 
 
 class SiteScopeTests(unittest.TestCase):
@@ -275,8 +286,13 @@ class SiteScopeTests(unittest.TestCase):
         self.assertNotIn("site", raw)
 
     def test_invalid_times_and_conflicting_schedules_are_rejected(self):
-        for options in ({}, {"times": ["not-a-time"]}, {"times": ["25:10"]},
-                        {"times": ["09:00"], "interval_minutes": 5}, {"interval_minutes": 0}):
+        for options in (
+            {},
+            {"times": ["not-a-time"]},
+            {"times": ["25:10"]},
+            {"times": ["09:00"], "interval_minutes": 5},
+            {"interval_minutes": 0},
+        ):
             with self.subTest(options=options), self.assertRaises(HTTPException):
                 sites._validate_registrar_schedule(options)
 
@@ -288,12 +304,18 @@ class SiteScopeTests(unittest.TestCase):
 class SiteDraftTests(unittest.IsolatedAsyncioTestCase):
     async def test_inactive_default_template_is_persisted(self):
         raw = {}
-        with patch.object(sites, "_read_config_dict", side_effect=lambda: copy.deepcopy(raw)), \
-                patch.object(sites, "_save") as save, \
-                patch.object(sites, "_custom_sites", return_value=[]):
-            result = await sites.save_custom_site(sites.CustomSitePayload(
-                type="checkiner", template="templ_a", bot="AuditBot", in_site_list=False,
-            ), True)
+        with patch.object(sites, "_read_config_dict", side_effect=lambda: copy.deepcopy(raw)), patch.object(
+            sites, "_save"
+        ) as save, patch.object(sites, "_custom_sites", return_value=[]):
+            result = await sites.save_custom_site(
+                sites.CustomSitePayload(
+                    type="checkiner",
+                    template="templ_a",
+                    bot="AuditBot",
+                    in_site_list=False,
+                ),
+                True,
+            )
         self.assertTrue(result["success"])
         self.assertEqual(save.call_args.args[0]["checkiner"]["templ_a<AuditBot>"], {})
 
@@ -301,12 +323,18 @@ class SiteDraftTests(unittest.IsolatedAsyncioTestCase):
 class AccountMergeTests(unittest.IsolatedAsyncioTestCase):
     async def test_telegram_edit_keeps_independent_config_and_empty_site_scope(self):
         account = TelegramAccount(
-            phone="+12345678901", checkiner_config={"time_range": "21:00", "retries": 9},
-            registrar_config={"concurrency": 2}, site={"checkiner": []},
+            phone="+12345678901",
+            checkiner_config={"time_range": "21:00", "retries": 9},
+            registrar_config={"concurrency": 2},
+            site={"checkiner": []},
         )
-        updated = telegram._account_from_payload(telegram.TelegramAccountPayload(
-            phone="+12345678901", monitor=True,
-        ), account)
+        updated = telegram._account_from_payload(
+            telegram.TelegramAccountPayload(
+                phone="+12345678901",
+                monitor=True,
+            ),
+            account,
+        )
         self.assertEqual(updated.checkiner_config.time_range, "21:00")
         self.assertEqual(updated.checkiner_config.retries, 9)
         self.assertEqual(updated.registrar_config.concurrency, 2)
@@ -314,16 +342,28 @@ class AccountMergeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_emby_edit_keeps_device_configuration_and_scalar_duration(self):
         account = EmbyAccount(
-            id="audit", url="https://example.invalid", username="audit", password="audit-secret",
-            client="AuditClient", device="AuditDevice", time=1200,
+            id="audit",
+            url="https://example.invalid",
+            username="audit",
+            password="audit-secret",
+            client="AuditClient",
+            device="AuditDevice",
+            time=1200,
         )
         raw = {"emby": {"account": [account.model_dump(mode="json", exclude_none=True)]}}
-        with patch.object(emby, "_load_emby_accounts", return_value=(None, raw, [account])), \
-                patch.object(emby, "_write_config_dict") as write, \
-                patch.object(emby, "_serialize_account", return_value={}):
-            result = await emby.update_emby_account("audit", emby.EmbyAccountPayload(
-                url="https://example.invalid", username="audit", name="Updated", password="",
-            ), True)
+        with patch.object(emby, "_load_emby_accounts", return_value=(None, raw, [account])), patch.object(
+            emby, "_write_config_dict"
+        ) as write, patch.object(emby, "_serialize_account", return_value={}):
+            result = await emby.update_emby_account(
+                "audit",
+                emby.EmbyAccountPayload(
+                    url="https://example.invalid",
+                    username="audit",
+                    name="Updated",
+                    password="",
+                ),
+                True,
+            )
         self.assertTrue(result["success"])
         stored = write.call_args.args[0]["emby"]["account"][0]
         self.assertEqual(stored["client"], "AuditClient")
@@ -333,16 +373,30 @@ class AccountMergeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_subsonic_edit_keeps_client_configuration_and_scalar_duration(self):
         account = SubsonicAccount(
-            id="audit", url="https://example.invalid", username="audit", password="audit-secret",
-            client="AuditClient", client_version="1.2", time=1200,
+            id="audit",
+            url="https://example.invalid",
+            username="audit",
+            password="audit-secret",
+            client="AuditClient",
+            client_version="1.2",
+            time=1200,
         )
         raw = {"subsonic": {"account": [account.model_dump(mode="json", exclude_none=True)]}}
-        with patch.object(subsonic, "_load_subsonic_accounts", return_value=(None, raw, [account])), \
-                patch.object(subsonic, "_write_config_dict") as write, \
-                patch.object(subsonic, "_serialize_account", return_value={}):
-            result = await subsonic.update_subsonic_account("audit", subsonic.SubsonicAccountPayload(
-                url="https://example.invalid", username="audit", name="Updated", password="",
-            ), True)
+        with patch.object(
+            subsonic, "_load_subsonic_accounts", return_value=(None, raw, [account])
+        ), patch.object(subsonic, "_write_config_dict") as write, patch.object(
+            subsonic, "_serialize_account", return_value={}
+        ):
+            result = await subsonic.update_subsonic_account(
+                "audit",
+                subsonic.SubsonicAccountPayload(
+                    url="https://example.invalid",
+                    username="audit",
+                    name="Updated",
+                    password="",
+                ),
+                True,
+            )
         self.assertTrue(result["success"])
         stored = write.call_args.args[0]["subsonic"]["account"][0]
         self.assertEqual(stored["client"], "AuditClient")
@@ -363,10 +417,16 @@ class ExecutionContractTests(unittest.TestCase):
     def test_each_registration_time_has_an_independent_fixed_scheduler(self):
         manager = registrar_main.RegisterManager.__new__(registrar_main.RegisterManager)
         account = SimpleNamespace(phone="+12345678901")
-        with patch.object(registrar_main, "Scheduler", side_effect=lambda **values: SimpleNamespace(**values)):
-            schedules = manager._schedule_site_timed(account, "templ_a<AuditBot>", {
-                "times": ["09:00", "21:00", "09:00"],
-            })
+        with patch.object(
+            registrar_main, "Scheduler", side_effect=lambda **values: SimpleNamespace(**values)
+        ):
+            schedules = manager._schedule_site_timed(
+                account,
+                "templ_a<AuditBot>",
+                {
+                    "times": ["09:00", "21:00", "09:00"],
+                },
+            )
         self.assertEqual(len(schedules), 2)
         self.assertEqual({scheduler.start_time for _, scheduler in schedules}, {"09:00", "21:00"})
         self.assertTrue(all(scheduler.start_time == scheduler.end_time for _, scheduler in schedules))
@@ -381,12 +441,17 @@ class ExecutionContractTests(unittest.TestCase):
         self.assertEqual(register.templ_name, "templ_a<AuditBot>")
 
     def test_ocr_presets_have_numeric_runtime_values(self):
-        option = next(option for option in sites._template_options("checkiner", "b")
-                      if option["key"] == "bot_captcha_char_range")
+        option = next(
+            option
+            for option in sites._template_options("checkiner", "b")
+            if option["key"] == "bot_captcha_char_range"
+        )
         self.assertEqual(option["choice_values"]["NUMBER"], 0)
         self.assertEqual(option["choice_values"]["NUMBER_LLETTER"], 4)
-        self.assertEqual(sites._validate_options("checkiner", "b", {"bot_captcha_char_range": 0}),
-                         {"bot_captcha_char_range": 0})
+        self.assertEqual(
+            sites._validate_options("checkiner", "b", {"bot_captcha_char_range": 0}),
+            {"bot_captcha_char_range": 0},
+        )
 
 
 if __name__ == "__main__":

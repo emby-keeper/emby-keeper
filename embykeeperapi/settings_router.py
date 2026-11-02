@@ -12,7 +12,9 @@ router = APIRouter()
 
 
 class PanelSettingsPayload(BaseModel):
-    backend_config_file: str = Field(default="", description="Business config file. Empty means <basedir>/config.toml.")
+    backend_config_file: str = Field(
+        default="", description="Business config file. Empty means <basedir>/config.toml."
+    )
 
 
 def _validate_and_prepare(payload: PanelSettingsPayload) -> PanelSettings:

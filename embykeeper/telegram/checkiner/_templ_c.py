@@ -8,7 +8,6 @@ from ..monitor import UniqueUsername
 from ..embyboss import EmbybossRegister
 from . import BotCheckin
 
-
 __ignore__ = True
 
 

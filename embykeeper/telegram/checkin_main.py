@@ -51,7 +51,7 @@ class _AccountState:
 
 
 class CheckinerManager:
-    '''Check-in manager.'''
+    """Check-in manager."""
 
     def __init__(self):
         self._accounts: Dict[str, _AccountState] = {}
@@ -159,7 +159,9 @@ class CheckinerManager:
 
     def _build_batch_specs(self, account: TelegramAccount):
         specs, site_names, config_to_use = self._build_checkin_specs(account)
-        batch_specs = [spec for spec in specs if not self._has_independent_time_range(spec.site_name, config_to_use)]
+        batch_specs = [
+            spec for spec in specs if not self._has_independent_time_range(spec.site_name, config_to_use)
+        ]
         return batch_specs, specs, site_names, config_to_use
 
     def _build_scheduler_specs(self, account: TelegramAccount):
@@ -257,7 +259,9 @@ class CheckinerManager:
         self._scheduler_signatures[spec.key] = spec.signature
         task = asyncio.create_task(scheduler.schedule(), name=f"Telegram 签到调度 {spec.key}")
         self._scheduler_tasks[spec.key] = task
-        task.add_done_callback(lambda t, key=spec.key, sched=scheduler: self._on_scheduler_done(key, sched, t))
+        task.add_done_callback(
+            lambda t, key=spec.key, sched=scheduler: self._on_scheduler_done(key, sched, t)
+        )
         return task
 
     def _on_scheduler_done(self, key: str, scheduler: Scheduler, task: asyncio.Task):
@@ -386,7 +390,8 @@ class CheckinerManager:
         restart_phones = {
             phone
             for phone in current_phones & desired_phones
-            if self._account_signature(self._accounts[phone].account) != self._account_signature(desired_accounts[phone])
+            if self._account_signature(self._accounts[phone].account)
+            != self._account_signature(desired_accounts[phone])
         }
 
         await self._stop_accounts((current_phones - desired_phones) | restart_phones)
@@ -537,7 +542,9 @@ class CheckinerManager:
             result = await checkiner._start()
             return checkiner, result
 
-    def _start_batch_site_task(self, state: _AccountState, ctx: RunContext, client: Client, spec: _CheckinSiteSpec):
+    def _start_batch_site_task(
+        self, state: _AccountState, ctx: RunContext, client: Client, spec: _CheckinSiteSpec
+    ):
         config_to_use = state.account.checkiner_config or config.checkiner
         site_ctx = RunContext.prepare(f"{spec.site_name} 站点签到", parent_ids=ctx.id)
         checkiner = spec.cls(
@@ -580,7 +587,9 @@ class CheckinerManager:
             self._run_single_site(ctx, phone, site_name),
             name=f"Telegram 单站点签到任务 {phone}.{site_name}",
         )
-        task.add_done_callback(lambda t, phone=phone, site_name=site_name: self._on_site_task_done(phone, site_name, t))
+        task.add_done_callback(
+            lambda t, phone=phone, site_name=site_name: self._on_site_task_done(phone, site_name, t)
+        )
         state.site_tasks[site_name] = task
         return task
 
@@ -701,7 +710,9 @@ class CheckinerManager:
             log.bind(log=True).info(f"签到成功 ({spec}).")
             return RunStatus.SUCCESS, "签到成功"
 
-    def schedule_site(self, ctx: RunContext, at: datetime, phone: str, site_name: str, reschedule: bool = False):
+    def schedule_site(
+        self, ctx: RunContext, at: datetime, phone: str, site_name: str, reschedule: bool = False
+    ):
         state = self._accounts.get(phone)
         if not state:
             return None
@@ -739,7 +750,9 @@ class CheckinerManager:
                 _schedule(),
                 name=f"Telegram 补签到任务 {phone}.{site_name}",
             )
-            task.add_done_callback(lambda t, phone=phone, site_name=site_name: self._on_site_task_done(phone, site_name, t))
+            task.add_done_callback(
+                lambda t, phone=phone, site_name=site_name: self._on_site_task_done(phone, site_name, t)
+            )
             state.site_tasks[site_name] = task
             return task
         except Exception as e:
@@ -810,7 +823,9 @@ class CheckinerManager:
 
         accounts = [a for a in config.telegram.account if a.enabled and a.checkiner]
         tasks = [
-            self._start_account_task(self._ensure_state(account), RunContext.prepare("运行全部签到器"), instant)
+            self._start_account_task(
+                self._ensure_state(account), RunContext.prepare("运行全部签到器"), instant
+            )
             for account in accounts
         ]
         tasks = [task for task in tasks if task]

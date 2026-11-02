@@ -15,9 +15,7 @@ router = APIRouter(prefix="/sse", tags=["sse"])
 
 
 async def event_generator(
-    channel: str,
-    request: Request,
-    initial_data: Optional[dict] = None
+    channel: str, request: Request, initial_data: Optional[dict] = None
 ) -> AsyncGenerator[str, None]:
     queue = await broadcaster.subscribe(channel)
     shutdown_event = get_shutdown_event()
@@ -67,7 +65,7 @@ async def logs_events(request: Request, _user=Depends(get_current_user)):
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
-        }
+        },
     )
 
 
@@ -80,7 +78,7 @@ async def status_events(request: Request, _user=Depends(get_current_user)):
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
-        }
+        },
     )
 
 
@@ -93,5 +91,5 @@ async def channel_events(channel: str, request: Request, _user=Depends(get_curre
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
-        }
+        },
     )

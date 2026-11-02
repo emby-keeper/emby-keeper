@@ -113,7 +113,11 @@ class ProcessManager:
         return (
             "embykeeper" in command
             and "--api" in cmdline
-            and ("python" in executable_names or "python3" in executable_names or any(name.startswith("python") for name in executable_names))
+            and (
+                "python" in executable_names
+                or "python3" in executable_names
+                or any(name.startswith("python") for name in executable_names)
+            )
         )
 
     def _find_listener_pid(self) -> Optional[int]:

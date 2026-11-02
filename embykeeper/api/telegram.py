@@ -29,7 +29,6 @@ from ..telegram.pyrogram import Client
 from ..telegram.dynamic import get_display_names, get_names
 from .sites import SITE_TYPES, _custom_sites, _read_config_dict as _read_sites_config
 
-
 router = APIRouter()
 
 
@@ -160,7 +159,9 @@ def _get_last_checkin_status(phone: str) -> Tuple[Optional[str], Optional[str]]:
             latest_status = status
             latest_time = run_time
 
-    return latest_status, latest_time.isoformat() if latest_time and latest_time != _sort_datetime(None) else None
+    return latest_status, (
+        latest_time.isoformat() if latest_time and latest_time != _sort_datetime(None) else None
+    )
 
 
 def _infer_checkin_outcome(ctx: RunContext) -> Optional[str]:
@@ -181,7 +182,6 @@ def _infer_checkin_outcome(ctx: RunContext) -> Optional[str]:
         if "签到成功" in message:
             return "success"
     return None
-
 
 
 def _replace_accounts(raw: Dict[str, Any], accounts: List[TelegramAccount]) -> Dict[str, Any]:
@@ -215,10 +215,18 @@ async def list_telegram_accounts(_: bool = Depends(require_auth)):
             "messager": 0,
             "registrar": 0,
             "use_proxy": bool(cfg.telegram.use_proxy) if cfg.telegram else True,
-            "checkiner_enabled": bool(cfg.checkiner.enabled) if cfg.checkiner and cfg.checkiner.enabled is not None else True,
-            "monitor_enabled": bool(cfg.monitor.enabled) if cfg.monitor and cfg.monitor.enabled is not None else True,
-            "messager_enabled": bool(cfg.messager.enabled) if cfg.messager and cfg.messager.enabled is not None else True,
-            "registrar_enabled": bool(cfg.registrar.enabled) if cfg.registrar and cfg.registrar.enabled is not None else True,
+            "checkiner_enabled": (
+                bool(cfg.checkiner.enabled) if cfg.checkiner and cfg.checkiner.enabled is not None else True
+            ),
+            "monitor_enabled": (
+                bool(cfg.monitor.enabled) if cfg.monitor and cfg.monitor.enabled is not None else True
+            ),
+            "messager_enabled": (
+                bool(cfg.messager.enabled) if cfg.messager and cfg.messager.enabled is not None else True
+            ),
+            "registrar_enabled": (
+                bool(cfg.registrar.enabled) if cfg.registrar and cfg.registrar.enabled is not None else True
+            ),
         }
         for a in accounts:
             status = _serialize_account(a)
@@ -261,7 +269,7 @@ async def save_telegram_settings(payload: TelegramSettingsPayload, _: bool = Dep
         merged["registrar"] = registrar_section
 
         validated = Config(**merged)
-        _write_config_dict(validated.model_dump(mode='json', exclude_none=True, exclude_unset=True))
+        _write_config_dict(validated.model_dump(mode="json", exclude_none=True, exclude_unset=True))
         return {"success": True}
     except ValidationError as e:
         raise HTTPException(status_code=400, detail=format_errors(e))
@@ -294,14 +302,8 @@ async def get_telegram_sites(_: bool = Depends(require_auth)):
             }
 
         return {
-            "sites": {
-                site_type: get_names(site_type)
-                for site_type in SITE_TYPES
-            },
-            "all_sites": {
-                site_type: get_names(site_type, allow_ignore=True)
-                for site_type in SITE_TYPES
-            },
+            "sites": {site_type: get_names(site_type) for site_type in SITE_TYPES},
+            "all_sites": {site_type: get_names(site_type, allow_ignore=True) for site_type in SITE_TYPES},
             "custom": custom,
             "display_names": {
                 site_type: {**get_display_names(site_type), **custom_names.get(site_type, {})}
@@ -339,7 +341,7 @@ async def create_telegram_account(payload: TelegramAccountPayload, _: bool = Dep
         accounts.append(account)
         merged = _replace_accounts(raw, accounts)
         validated = Config(**merged)
-        _write_config_dict(validated.model_dump(mode='json', exclude_none=True, exclude_unset=True))
+        _write_config_dict(validated.model_dump(mode="json", exclude_none=True, exclude_unset=True))
         return {"success": True, "account": _serialize_account(account)}
     except HTTPException:
         raise
@@ -350,7 +352,9 @@ async def create_telegram_account(payload: TelegramAccountPayload, _: bool = Dep
 
 
 @router.put("/telegram/accounts/{phone}")
-async def update_telegram_account(phone: str, payload: TelegramAccountPayload, _: bool = Depends(require_auth)):
+async def update_telegram_account(
+    phone: str, payload: TelegramAccountPayload, _: bool = Depends(require_auth)
+):
     try:
         _, raw, accounts = _load_telegram_accounts()
         next_account = _account_from_payload(payload)
@@ -373,7 +377,7 @@ async def update_telegram_account(phone: str, payload: TelegramAccountPayload, _
 
         merged = _replace_accounts(raw, next_accounts)
         validated = Config(**merged)
-        _write_config_dict(validated.model_dump(mode='json', exclude_none=True, exclude_unset=True))
+        _write_config_dict(validated.model_dump(mode="json", exclude_none=True, exclude_unset=True))
         return {"success": True, "account": _serialize_account(next_account)}
     except HTTPException:
         raise
@@ -413,6 +417,7 @@ async def _run_telegram_login(account: TelegramAccount, login_id: str):
             )
             if var.telegram_test_server:
                 from ..telegram.session import _test_dc_id, _test_dc_ip, _test_dc_port
+
                 client.session.set_dc(_test_dc_id, _test_dc_ip, _test_dc_port)
 
             entry["state"] = "connecting"
@@ -459,7 +464,12 @@ async def _run_telegram_login(account: TelegramAccount, login_id: str):
                     entry["state"] = "password_error"
                     entry["message"] = "两步验证密码错误，请重新输入。"
                     continue
-                except (errors.PhoneCodeInvalidError, errors.PhoneCodeExpiredError, errors.PhoneCodeEmptyError, errors.PhoneCodeHashEmptyError):
+                except (
+                    errors.PhoneCodeInvalidError,
+                    errors.PhoneCodeExpiredError,
+                    errors.PhoneCodeEmptyError,
+                    errors.PhoneCodeHashEmptyError,
+                ):
                     entry["state"] = "code_error"
                     entry["message"] = "验证码错误或已过期，请重新输入。"
                     continue
@@ -618,7 +628,7 @@ async def delete_telegram_account(phone: str, _: bool = Depends(require_auth)):
 
         merged = _replace_accounts(raw, next_accounts)
         validated = Config(**merged)
-        _write_config_dict(validated.model_dump(mode='json', exclude_none=True, exclude_unset=True))
+        _write_config_dict(validated.model_dump(mode="json", exclude_none=True, exclude_unset=True))
         return {
             "success": True,
             "summary": {

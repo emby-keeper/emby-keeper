@@ -18,7 +18,9 @@ def _get_webpass() -> Optional[str]:
 
 def validate_webpass() -> None:
     if _get_webpass() == "your-password":
-        raise ValueError("EK_WEBPASS cannot be the example password 'your-password'; choose a different password.")
+        raise ValueError(
+            "EK_WEBPASS cannot be the example password 'your-password'; choose a different password."
+        )
 
 
 def _get_token_from_request(request: Request) -> Optional[str]:

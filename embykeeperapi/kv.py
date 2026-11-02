@@ -18,7 +18,7 @@ class KVStore:
     def _load(self):
         try:
             if self.path.exists():
-                with open(self.path, 'r', encoding='utf-8') as f:
+                with open(self.path, "r", encoding="utf-8") as f:
                     self._data = json.load(f)
                 logger.debug(f"KV store loaded from {self.path}")
         except Exception as e:
@@ -28,7 +28,7 @@ class KVStore:
     def _save(self):
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.path, 'w', encoding='utf-8') as f:
+            with open(self.path, "w", encoding="utf-8") as f:
                 json.dump(self._data, f, ensure_ascii=False, indent=2)
         except Exception as e:
             logger.error(f"Failed to save KV store: {e}")

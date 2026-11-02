@@ -47,15 +47,13 @@ async def dump(client: Client, message: Message):
 
 
 async def start(client: Client, message: Message):
-    content = dedent(
-        """
+    content = dedent("""
     ✨ 只有你想见我的时候我们的相遇才有意义
 
     🍉你好鸭 ********* 请选择功能👇
 
     📠请在下方选择您要使用的功能!
-    """.strip()
-    )
+    """.strip())
     await client.send_photo(
         message.chat.id,
         main_photo,
@@ -89,15 +87,13 @@ async def callback_checkin(client: Client, callback: CallbackQuery):
         num1 = num2 * result
 
     states[callback.from_user.id] = str(result)
-    content = dedent(
-        f"""
+    content = dedent(f"""
     🎯 签到说明：
 
     在120s内计算出 {num1} {operation} {num2} = ?
     结果正确你将会随机获得6 ~ 18 硬币(概率获得88 硬币)
     结果错误你将会随机扣除6 ~ 18 硬币(概率扣除88 硬币), 请谨慎回答
-    """
-    ).strip()
+    """).strip()
     await client.send_photo(
         chat_id=callback.message.chat.id,
         photo=main_photo,
@@ -111,13 +107,11 @@ async def result(client: Client, message: Message):
     r = message.text
     if r == states.get(message.from_user.id, None):
         signed[message.from_user.id] = True
-        content = dedent(
-            """
+        content = dedent("""
         🎉 签到完成 | 本次签到你获得了 14 硬币
         💴 当前硬币余额 | 184
         ⏳ 签到日期 | 2024-07-08
-        """.strip()
-        )
+        """.strip())
         await client.send_photo(
             message.chat.id,
             main_photo,

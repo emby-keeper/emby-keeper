@@ -9,7 +9,6 @@ from fastapi.responses import StreamingResponse
 from ..cache import cache
 from ..runinfo import RunContext, RunStatus, _running_runs
 
-
 router = APIRouter()
 
 
@@ -292,11 +291,13 @@ async def get_logs(
                         continue
 
                     if keyword:
-                        haystack = " ".join([
-                            str(item["message"] or ""),
-                            str(item["description"] or ""),
-                            str(item["run_id"] or ""),
-                        ]).lower()
+                        haystack = " ".join(
+                            [
+                                str(item["message"] or ""),
+                                str(item["description"] or ""),
+                                str(item["run_id"] or ""),
+                            ]
+                        ).lower()
                         if keyword.lower() not in haystack:
                             continue
 
@@ -368,7 +369,9 @@ async def list_children_runs(
 
 
 @router.get("/runinfo/logs/stream")
-async def stream_logs(include_children: bool = True, level: Optional[str] = None, keyword: Optional[str] = None):
+async def stream_logs(
+    include_children: bool = True, level: Optional[str] = None, keyword: Optional[str] = None
+):
     async def event_generator():
         import asyncio
 
@@ -521,9 +524,7 @@ async def _trigger_checkin():
     manager = CheckinerManager()
     ctx = RunContext.prepare(description="立即触发签到")
     ctx.start(RunStatus.INITIALIZING)
-    accounts = [
-        a for a in (config_manager.telegram.account or []) if a.enabled and a.checkiner
-    ]
+    accounts = [a for a in (config_manager.telegram.account or []) if a.enabled and a.checkiner]
     if not accounts:
         ctx.finish(RunStatus.NONEED, "没有启用签到的账号")
         return ctx
@@ -554,9 +555,7 @@ async def _trigger_emby_keepalive():
     await config_manager.reload_conf(_active_config_file(config_manager))
 
     manager = EmbyManager()
-    accounts = [
-        a for a in (config_manager.emby.account or []) if a.enabled
-    ]
+    accounts = [a for a in (config_manager.emby.account or []) if a.enabled]
     if not accounts:
         ctx = RunContext.prepare(description="立即触发 Emby 保活")
         ctx.start(RunStatus.INITIALIZING)
@@ -574,9 +573,7 @@ async def _trigger_subsonic_keepalive():
     await config_manager.reload_conf(_active_config_file(config_manager))
 
     manager = SubsonicManager()
-    accounts = [
-        a for a in (config_manager.subsonic.account or []) if a.enabled
-    ]
+    accounts = [a for a in (config_manager.subsonic.account or []) if a.enabled]
     if not accounts:
         ctx = RunContext.prepare(description="立即触发 Subsonic 保活")
         ctx.start(RunStatus.INITIALIZING)

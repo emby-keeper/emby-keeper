@@ -7,7 +7,6 @@ from embykeeper.runinfo import RunStatus
 
 from ._templ_a import TemplateACheckin
 
-
 __ignore__ = True
 
 

@@ -156,7 +156,11 @@ class RegisterManager:
         return sites
 
     def schedule_account(self, account: TelegramAccount) -> bool:
-        if (not self._module_enabled()) or (not account.enabled) or (not getattr(account, "registrar", False)):
+        if (
+            (not self._module_enabled())
+            or (not account.enabled)
+            or (not getattr(account, "registrar", False))
+        ):
             return False
 
         self.stop_account(account.phone)
@@ -207,7 +211,7 @@ class RegisterManager:
 
             def on_next_time(t: datetime, scheduled_time: str = time_value):
                 logger.info(
-                    f"下一次 \"{phone_masked}\" 账号 {site_name} 站点的注册将在 {t:%m-%d} {scheduled_time} 进行."
+                    f'下一次 "{phone_masked}" 账号 {site_name} 站点的注册将在 {t:%m-%d} {scheduled_time} 进行.'
                 )
                 date_ctx = RunContext.get_or_create(f"registrar.date.{t:%Y%m%d}")
                 account_ctx = RunContext.get_or_create(f"registrar.account.{account.phone}")

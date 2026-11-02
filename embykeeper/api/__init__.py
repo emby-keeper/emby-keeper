@@ -1,4 +1,5 @@
 """Embykeeper API module."""
+
 import asyncio
 import sys
 from contextlib import asynccontextmanager

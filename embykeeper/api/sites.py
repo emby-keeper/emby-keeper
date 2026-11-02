@@ -55,7 +55,12 @@ TYPE_CONFIG_MODELS = {
 # 任意站点都支持 (见 checkin_main._has_independent_time_range / registrar_main)
 UNIVERSAL_OPTIONS = {
     "checkiner": [
-        {"key": "time_range", "type": "str", "default": None, "description": "该站点单独的签到时段, 设置后将从常规签到中拆出独立执行"},
+        {
+            "key": "time_range",
+            "type": "str",
+            "default": None,
+            "description": "该站点单独的签到时段, 设置后将从常规签到中拆出独立执行",
+        },
         {"key": "interval_days", "type": "int|str", "default": None, "description": "该站点单独的间隔天数"},
     ],
     # 抢注站点必须配置 times 或 interval_minutes 之一, 否则会被跳过
@@ -81,7 +86,10 @@ UNIVERSAL_OPTIONS = {
 
 # times / interval_minutes 二选一必填, 用于前端提示
 REQUIRED_GROUPS = {
-    "registrar": (["times", "interval_minutes"], "抢注站点必须配置 times 或 interval_minutes 之一, 否则会被跳过。"),
+    "registrar": (
+        ["times", "interval_minutes"],
+        "抢注站点必须配置 times 或 interval_minutes 之一, 否则会被跳过。",
+    ),
 }
 
 # 内置站点的按站点选项说明 (源码里没有注释时作为补充)
@@ -157,8 +165,14 @@ OPTION_TYPE_HINTS = {
 OPTION_CHOICE_HINTS = {
     "only": ["weekday", "weekend"],
     "bot_captcha_char_range": [
-        "NUMBER", "LLETTER", "ULETTER", "LLETTER_ULETTER", "NUMBER_LLETTER",
-        "NUMBER_ULETTER", "NUMBER_LLETTER_ULETTER", "NOT_NUMBER_LLETTER_ULETTER",
+        "NUMBER",
+        "LLETTER",
+        "ULETTER",
+        "LLETTER_ULETTER",
+        "NUMBER_LLETTER",
+        "NUMBER_ULETTER",
+        "NUMBER_LLETTER_ULETTER",
+        "NOT_NUMBER_LLETTER_ULETTER",
     ],
 }
 
@@ -176,14 +190,23 @@ OPTION_CHOICE_VALUE_HINTS = {
 }
 
 TEMPLATE_HINTS = {
-    ("checkiner", "templ_a"): "Sakura_embyboss 面板式机器人: 识别主菜单关键词并点击签到按钮, 支持识别输入式验证码.",
+    (
+        "checkiner",
+        "templ_a",
+    ): "Sakura_embyboss 面板式机器人: 识别主菜单关键词并点击签到按钮, 支持识别输入式验证码.",
     ("checkiner", "templ_b"): "通用签到机器人: 直接发送签到命令, 支持 OCR 识别验证码.",
-    ("checkiner", "templ_c"): "注册流程模板: 在「签到」调度下尝试注册该机器人, 未开注时按 interval 秒自动重排重试 (相当于定时开注测试).",
+    (
+        "checkiner",
+        "templ_c",
+    ): "注册流程模板: 在「签到」调度下尝试注册该机器人, 未开注时按 interval 秒自动重排重试 (相当于定时开注测试).",
     ("monitor", "templ_a"): "自定义监控: 识别到指定关键词后发送通知, 或自动在群组发送信息.",
     ("monitor", "templ_b"): "自定义监控: 多人发送相同消息后自动跟发.",
     ("messager", "templ_a"): "自定义水群: 在指定群组按间隔发送固定消息或消息列表.",
     ("messager", "templ_b"): "自定义水群: 使用 AI 按风格生成消息并发送.",
-    ("registrar", "templ_a"): "注册流程模板: 在「抢注」调度下尝试注册该机器人 (与签到 templ_c 是同一套注册流程, 区别在调度与所属模块; 需高级用户).",
+    (
+        "registrar",
+        "templ_a",
+    ): "注册流程模板: 在「抢注」调度下尝试注册该机器人 (与签到 templ_c 是同一套注册流程, 区别在调度与所属模块; 需高级用户).",
 }
 
 
@@ -391,7 +414,11 @@ def _discover_config_options(module) -> List[Dict[str, Any]]:
             continue
         if not _is_config_get(node):
             continue
-        if not node.args or not isinstance(node.args[0], ast.Constant) or not isinstance(node.args[0].value, str):
+        if (
+            not node.args
+            or not isinstance(node.args[0], ast.Constant)
+            or not isinstance(node.args[0].value, str)
+        ):
             continue
 
         key = node.args[0].value
@@ -508,7 +535,9 @@ def _template_options(site_type: str, kind: str) -> List[Dict[str, Any]]:
         seen.add(key)
         configured_default = None if field.is_required() else _jsonable(field.default)
         runtime_default = getattr(runtime_class, key, None) if runtime_class is not None else None
-        effective_default = configured_default if configured_default is not None else _jsonable(runtime_default)
+        effective_default = (
+            configured_default if configured_default is not None else _jsonable(runtime_default)
+        )
         option: Dict[str, Any] = {
             "key": key,
             "type": _annotation_name(field.annotation),
@@ -627,13 +656,22 @@ def _custom_sites(raw: Dict[str, Any], site_type: str) -> List[Dict[str, Any]]:
 
     for item in items.values():
         item.setdefault("display_name", str(item["options"].get("name") or item["name"]))
-        entries = [entry for entry in _site_list_entries(raw, site_type) if _parse_site_name(entry) and _parse_site_name(entry)["name"] == item["name"]]
-        item["site_list_entry"] = next((entry for entry in entries if not entry.startswith("-")), entries[0] if entries else None)
+        entries = [
+            entry
+            for entry in _site_list_entries(raw, site_type)
+            if _parse_site_name(entry) and _parse_site_name(entry)["name"] == item["name"]
+        ]
+        item["site_list_entry"] = next(
+            (entry for entry in entries if not entry.startswith("-")), entries[0] if entries else None
+        )
         item["list_mode"] = (
-            "append" if item["site_list_entry"] and item["site_list_entry"].startswith("+")
-            else "exclude" if item["site_list_entry"] and item["site_list_entry"].startswith("-")
-            else "explicit" if item["site_list_entry"]
-            else "not_listed"
+            "append"
+            if item["site_list_entry"] and item["site_list_entry"].startswith("+")
+            else (
+                "exclude"
+                if item["site_list_entry"] and item["site_list_entry"].startswith("-")
+                else "explicit" if item["site_list_entry"] else "not_listed"
+            )
         )
     return sorted(items.values(), key=lambda item: item["name"])
 
@@ -707,7 +745,9 @@ def _validate_registrar_schedule(options: Dict[str, Any]) -> None:
 
     if times is not None and not isinstance(times, (list, tuple)):
         raise HTTPException(status_code=400, detail="times 必须是时间点列表。")
-    if isinstance(times, (list, tuple)) and any(not isinstance(item, str) or not item.strip() for item in times):
+    if isinstance(times, (list, tuple)) and any(
+        not isinstance(item, str) or not item.strip() for item in times
+    ):
         raise HTTPException(status_code=400, detail="times 中的每一项都必须是非空时间字符串。")
     for value in times or []:
         for clock_format in ("%H:%M", "%H:%M:%S", "%I:%M%p", "%I:%M %p", "%I%p"):
@@ -718,7 +758,9 @@ def _validate_registrar_schedule(options: Dict[str, Any]) -> None:
                 continue
         else:
             raise HTTPException(status_code=400, detail=f"无效的抢注时间：{value}。请使用 HH:MM 格式。")
-    if interval is not None and (not isinstance(interval, int) or isinstance(interval, bool) or interval <= 0):
+    if interval is not None and (
+        not isinstance(interval, int) or isinstance(interval, bool) or interval <= 0
+    ):
         raise HTTPException(status_code=400, detail="interval_minutes 必须是大于 0 的整数。")
 
     has_times = isinstance(times, (list, tuple)) and bool(times)
@@ -739,7 +781,9 @@ async def list_custom_sites(_: bool = Depends(require_auth)):
             model = CoreConfig(**raw)
             defaults = {
                 "time_range": (
-                    str(model.checkiner.time_range) if model.checkiner and model.checkiner.time_range else None
+                    str(model.checkiner.time_range)
+                    if model.checkiner and model.checkiner.time_range
+                    else None
                 ),
                 "interval_days": (
                     str(model.checkiner.interval_days)

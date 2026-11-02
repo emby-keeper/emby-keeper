@@ -81,8 +81,7 @@ async def dump(client: Client, message: Message):
 
 
 async def start(client: Client, message: Message):
-    content = dedent(
-        """
+    content = dedent("""
     ✨ 只有你想见我的时候我们的相遇才有意义
 
     Jellyfin 当前用户量: 1000
@@ -90,8 +89,7 @@ async def start(client: Client, message: Message):
     开放注册状态: 关
 
     🍉你好鸭 XX 请选择功能👇
-    """.strip()
-    )
+    """.strip())
     await client.send_photo(
         message.chat.id,
         main_photo,
@@ -101,8 +99,7 @@ async def start(client: Client, message: Message):
 
 
 async def callback_info(client: Client, callback: CallbackQuery):
-    content = dedent(
-        """
+    content = dedent("""
     用户名称: XXX
     绑定 tg id: 1000000000
     部分分类状态: 显示
@@ -113,8 +110,7 @@ async def callback_info(client: Client, callback: CallbackQuery):
     最后观看时间: Mon Jan 1 00:00:00 CST 2024
     积分: 0
     保号规则: 14 内有观看记录(每周五自助解封/150 积分解封)
-    """
-    ).strip()
+    """).strip()
     await callback.message.edit_caption(caption=content, reply_markup=info_reply_markup)
     await callback.answer()
 

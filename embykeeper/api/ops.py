@@ -17,7 +17,6 @@ from ..config import config as config_manager
 from ..runinfo import RunContext, RunStatus
 from ..schema import Config, EmbyAccount, SubsonicAccount, TelegramAccount
 
-
 router = APIRouter()
 
 
@@ -33,8 +32,6 @@ def _load_config() -> Config:
     if not cfg_path.exists():
         return Config()
     return Config(**tomllib.loads(cfg_path.read_text()))
-
-
 
 
 def _parse_day(day: Optional[str]) -> datetime:
@@ -66,7 +63,6 @@ def _is_terminal(ctx: RunContext) -> bool:
     }
 
 
-
 def _history_records(prefix: str, account_host: str, username: str) -> List[Dict[str, str]]:
     key = f"{prefix}.{account_host}.{username}"
     raw = cache.get(key, []) or []
@@ -85,7 +81,9 @@ def _history_records(prefix: str, account_host: str, username: str) -> List[Dict
     return records
 
 
-def _status_from_history(records: List[Dict[str, str]], day_start: datetime, day_end: datetime, is_today: bool):
+def _status_from_history(
+    records: List[Dict[str, str]], day_start: datetime, day_end: datetime, is_today: bool
+):
     day_hits = []
     for record in records:
         try:
@@ -124,9 +122,13 @@ def _build_recent_days(all_contexts, cfg, days: int = 14) -> List[Dict[str, Any]
     telegram_accounts = list(cfg.telegram.account or []) if cfg.telegram else []
     emby_accounts = list(cfg.emby.account or []) if cfg.emby else []
     subsonic_accounts = list(cfg.subsonic.account or []) if cfg.subsonic else []
-    checkiner_enabled = bool(cfg.checkiner.enabled) if cfg.checkiner and cfg.checkiner.enabled is not None else True
+    checkiner_enabled = (
+        bool(cfg.checkiner.enabled) if cfg.checkiner and cfg.checkiner.enabled is not None else True
+    )
     emby_enabled = bool(cfg.emby.enabled) if cfg.emby and cfg.emby.enabled is not None else True
-    subsonic_enabled = bool(cfg.subsonic.enabled) if cfg.subsonic and cfg.subsonic.enabled is not None else True
+    subsonic_enabled = (
+        bool(cfg.subsonic.enabled) if cfg.subsonic and cfg.subsonic.enabled is not None else True
+    )
 
     recent = []
     for offset in range(days):
@@ -142,7 +144,11 @@ def _build_recent_days(all_contexts, cfg, days: int = 14) -> List[Dict[str, Any]
                     continue
                 total += 1
                 target = f"{account.phone} 账号签到"
-                day_runs = [ctx for ctx in all_contexts if ctx.description == target and _in_day(ctx, day_start, day_end) and _is_terminal(ctx)]
+                day_runs = [
+                    ctx
+                    for ctx in all_contexts
+                    if ctx.description == target and _in_day(ctx, day_start, day_end) and _is_terminal(ctx)
+                ]
                 day_runs.sort(key=_ctx_time, reverse=True)
                 outcome = _infer_checkin_outcome(day_runs[0]) if day_runs else None
                 if outcome in {"failed", "partial_failed"}:
@@ -197,6 +203,7 @@ def _build_recent_days(all_contexts, cfg, days: int = 14) -> List[Dict[str, Any]
             }
         )
     return recent
+
 
 def _emby_spec(account: EmbyAccount) -> str:
     return f"{account.username}@{account.name or account.url.host}"
@@ -263,6 +270,7 @@ def _keepalive_outcome(ctx: RunContext, account_spec: str) -> Optional[str]:
             return "failed"
     return None
 
+
 def _latest_outcome_for_account(
     contexts: List[RunContext],
     matcher,
@@ -293,7 +301,9 @@ def _latest_outcome_for_account(
     )
 
 
-def _scan_attention_events(contexts: List[RunContext], start: datetime, end: datetime, limit: int = 12) -> List[Dict[str, Any]]:
+def _scan_attention_events(
+    contexts: List[RunContext], start: datetime, end: datetime, limit: int = 12
+) -> List[Dict[str, Any]]:
     events: List[Dict[str, Any]] = []
     keywords = (
         ("邀请码", "invite"),
@@ -330,7 +340,9 @@ def _scan_attention_events(contexts: List[RunContext], start: datetime, end: dat
                 module_key = "messager"
             elif "subsonic" in description_lower:
                 module_key = "subsonic"
-            elif "emby" in description_lower or ("保活" in description and "subsonic" not in description_lower):
+            elif "emby" in description_lower or (
+                "保活" in description and "subsonic" not in description_lower
+            ):
                 module_key = "emby"
             elif matched_kind in {"checkin_fail", "checkin_partial"} or "签到" in description:
                 module_key = "checkin"
@@ -424,11 +436,19 @@ async def get_ops_overview(
         emby_accounts = list(cfg.emby.account or []) if cfg.emby else []
         subsonic_accounts = list(cfg.subsonic.account or []) if cfg.subsonic else []
 
-        checkiner_enabled = bool(cfg.checkiner.enabled) if cfg.checkiner and cfg.checkiner.enabled is not None else True
-        monitor_enabled = bool(cfg.monitor.enabled) if cfg.monitor and cfg.monitor.enabled is not None else True
-        messager_enabled = bool(cfg.messager.enabled) if cfg.messager and cfg.messager.enabled is not None else True
+        checkiner_enabled = (
+            bool(cfg.checkiner.enabled) if cfg.checkiner and cfg.checkiner.enabled is not None else True
+        )
+        monitor_enabled = (
+            bool(cfg.monitor.enabled) if cfg.monitor and cfg.monitor.enabled is not None else True
+        )
+        messager_enabled = (
+            bool(cfg.messager.enabled) if cfg.messager and cfg.messager.enabled is not None else True
+        )
         emby_enabled = bool(cfg.emby.enabled) if cfg.emby and cfg.emby.enabled is not None else True
-        subsonic_enabled = bool(cfg.subsonic.enabled) if cfg.subsonic and cfg.subsonic.enabled is not None else True
+        subsonic_enabled = (
+            bool(cfg.subsonic.enabled) if cfg.subsonic and cfg.subsonic.enabled is not None else True
+        )
 
         # --- Checkin ---
         checkin_items: List[Dict[str, Any]] = []
@@ -436,9 +456,7 @@ async def get_ops_overview(
         for account in checkin_accounts:
             target = f"{account.phone} 账号签到"
             day_runs = [
-                ctx
-                for ctx in all_contexts
-                if ctx.description == target and _in_day(ctx, day_start, day_end)
+                ctx for ctx in all_contexts if ctx.description == target and _in_day(ctx, day_start, day_end)
             ]
             day_runs.sort(key=_ctx_time, reverse=True)
 
@@ -494,7 +512,9 @@ async def get_ops_overview(
             enabled=checkiner_enabled,
             total=len(checkin_items),
             success=_count_status(checkin_items, "success", "last_success"),
-            attention=_count_status(checkin_items, "failed", "partial_failed", "last_failed", "last_partial_failed"),
+            attention=_count_status(
+                checkin_items, "failed", "partial_failed", "last_failed", "last_partial_failed"
+            ),
             pending=_count_status(checkin_items, "running"),
             unknown=_count_status(checkin_items, "unknown"),
             items=checkin_items,
@@ -651,18 +671,24 @@ async def get_ops_overview(
             "state": (
                 "disabled"
                 if not monitor_enabled
-                else "empty"
-                if not monitor_accounts
-                else "attention"
-                if invite_events or warning_events
-                else "ok"
+                else (
+                    "empty"
+                    if not monitor_accounts
+                    else "attention" if invite_events or warning_events else "ok"
+                )
             ),
             "summary": (
                 "未启用"
                 if not monitor_enabled
-                else "没有启用监控的账号"
-                if not monitor_accounts
-                else (f"发现 {len(invite_events)} 条邀请相关记录" if invite_events else "暂无需要关注的监控事件")
+                else (
+                    "没有启用监控的账号"
+                    if not monitor_accounts
+                    else (
+                        f"发现 {len(invite_events)} 条邀请相关记录"
+                        if invite_events
+                        else "暂无需要关注的监控事件"
+                    )
+                )
             ),
             "counts": {
                 "total": len(monitor_accounts),
@@ -678,18 +704,16 @@ async def get_ops_overview(
             "state": (
                 "disabled"
                 if not messager_enabled
-                else "empty"
-                if not messager_accounts
-                else "attention"
-                if warning_events
-                else "ok"
+                else "empty" if not messager_accounts else "attention" if warning_events else "ok"
             ),
             "summary": (
                 "未启用"
                 if not messager_enabled
-                else "没有启用水群的账号"
-                if not messager_accounts
-                else (f"{len(warning_events)} 条警告/错误" if warning_events else "暂无异常提示")
+                else (
+                    "没有启用水群的账号"
+                    if not messager_accounts
+                    else (f"{len(warning_events)} 条警告/错误" if warning_events else "暂无异常提示")
+                )
             ),
             "counts": {
                 "total": len(messager_accounts),
@@ -788,9 +812,13 @@ async def get_ops_calendar(
         telegram_accounts = list(cfg.telegram.account or []) if cfg.telegram else []
         emby_accounts = list(cfg.emby.account or []) if cfg.emby else []
         subsonic_accounts = list(cfg.subsonic.account or []) if cfg.subsonic else []
-        checkiner_enabled = bool(cfg.checkiner.enabled) if cfg.checkiner and cfg.checkiner.enabled is not None else True
+        checkiner_enabled = (
+            bool(cfg.checkiner.enabled) if cfg.checkiner and cfg.checkiner.enabled is not None else True
+        )
         emby_enabled = bool(cfg.emby.enabled) if cfg.emby and cfg.emby.enabled is not None else True
-        subsonic_enabled = bool(cfg.subsonic.enabled) if cfg.subsonic and cfg.subsonic.enabled is not None else True
+        subsonic_enabled = (
+            bool(cfg.subsonic.enabled) if cfg.subsonic and cfg.subsonic.enabled is not None else True
+        )
 
         days: List[Dict[str, Any]] = []
         for day_offset in range(days_in_month):
@@ -806,7 +834,13 @@ async def get_ops_calendar(
                         continue
                     total += 1
                     target = f"{account.phone} 账号签到"
-                    day_runs = [ctx for ctx in all_contexts if ctx.description == target and _in_day(ctx, day_start, day_end) and _is_terminal(ctx)]
+                    day_runs = [
+                        ctx
+                        for ctx in all_contexts
+                        if ctx.description == target
+                        and _in_day(ctx, day_start, day_end)
+                        and _is_terminal(ctx)
+                    ]
                     day_runs.sort(key=_ctx_time, reverse=True)
                     outcome = _infer_checkin_outcome(day_runs[0]) if day_runs else None
                     if outcome in {"failed", "partial_failed"}:

@@ -117,7 +117,7 @@ def print_help(ctx: typer.Context, param: typer.CallbackParam, value: bool):
     epilog="网页管理: embykeeper web",
     help=(
         f"欢迎使用 [orange3]{__product__.capitalize()}[/] {__version__} " ":cinema: 无参数默认开启全部功能."
-    )
+    ),
 )
 async def main(
     config_file: Path = typer.Argument(
@@ -588,7 +588,9 @@ async def main(
         def start_telegram_runtime_tasks(targets=None):
             selected = set(targets or ("checkiner", "registrar", "monitor", "messager"))
             if "checkiner" in selected and checkin_man:
-                track_runtime_task(telegram_runtime_tasks, "checkiner", checkin_man.schedule_all(), "站点签到")
+                track_runtime_task(
+                    telegram_runtime_tasks, "checkiner", checkin_man.schedule_all(), "站点签到"
+                )
             if "registrar" in selected and register_man:
                 track_runtime_task(telegram_runtime_tasks, "registrar", register_man.start(), "站点注册")
             if "monitor" in selected and monitor_man:
@@ -601,11 +603,17 @@ async def main(
             if "emby" in selected and emby_man:
                 track_runtime_task(media_runtime_tasks, "emby", emby_man.schedule_all(), "Emby 保活")
             if "subsonic" in selected and subsonic_man:
-                track_runtime_task(media_runtime_tasks, "subsonic", subsonic_man.schedule_all(), "Subsonic 保活")
+                track_runtime_task(
+                    media_runtime_tasks, "subsonic", subsonic_man.schedule_all(), "Subsonic 保活"
+                )
 
         async def cancel_runtime_tasks(task_store: dict, targets):
             selected = set(targets)
-            current_tasks = [task_store.get(name) for name in selected if task_store.get(name) and not task_store.get(name).done()]
+            current_tasks = [
+                task_store.get(name)
+                for name in selected
+                if task_store.get(name) and not task_store.get(name).done()
+            ]
             for task in current_tasks:
                 task.cancel()
             if current_tasks:
@@ -618,16 +626,36 @@ async def main(
             return any(account.enabled and getattr(account, attr, False) for account in accounts)
 
         def telegram_checkiner_active():
-            return bool(checkin_man and config.checkiner and config.checkiner.enabled and has_active_telegram_accounts("checkiner"))
+            return bool(
+                checkin_man
+                and config.checkiner
+                and config.checkiner.enabled
+                and has_active_telegram_accounts("checkiner")
+            )
 
         def telegram_monitor_active():
-            return bool(monitor_man and config.monitor and config.monitor.enabled and has_active_telegram_accounts("monitor"))
+            return bool(
+                monitor_man
+                and config.monitor
+                and config.monitor.enabled
+                and has_active_telegram_accounts("monitor")
+            )
 
         def telegram_messager_active():
-            return bool(message_man and config.messager and config.messager.enabled and has_active_telegram_accounts("messager"))
+            return bool(
+                message_man
+                and config.messager
+                and config.messager.enabled
+                and has_active_telegram_accounts("messager")
+            )
 
         def telegram_registrar_active():
-            return bool(register_man and config.registrar and config.registrar.enabled and has_active_telegram_accounts("registrar"))
+            return bool(
+                register_man
+                and config.registrar
+                and config.registrar.enabled
+                and has_active_telegram_accounts("registrar")
+            )
 
         def notifier_uses_telegram_proxy():
             return bool(
@@ -669,7 +697,12 @@ async def main(
             targets = set()
 
             emby_accounts = config.emby.account if config.emby and config.emby.account else []
-            if emby_man and config.emby and config.emby.enabled and any(a.enabled and a.use_proxy for a in emby_accounts):
+            if (
+                emby_man
+                and config.emby
+                and config.emby.enabled
+                and any(a.enabled and a.use_proxy for a in emby_accounts)
+            ):
                 targets.add("emby")
 
             subsonic_accounts = config.subsonic.account if config.subsonic and config.subsonic.account else []
@@ -755,11 +788,15 @@ async def main(
             )
 
             if not telegram_targets and not media_targets and not clean_telegram_sessions:
-                logger.bind(scheme="config").info("检测到代理设置变更, 当前没有运行中的模块依赖该代理, 跳过重启.")
+                logger.bind(scheme="config").info(
+                    "检测到代理设置变更, 当前没有运行中的模块依赖该代理, 跳过重启."
+                )
                 return
 
             async with runtime_restart_lock:
-                await restart_telegram_runtime_locked("代理设置", telegram_targets, clean_sessions=clean_telegram_sessions)
+                await restart_telegram_runtime_locked(
+                    "代理设置", telegram_targets, clean_sessions=clean_telegram_sessions
+                )
                 await restart_media_runtime_locked("代理设置", media_targets)
 
         def handle_telegram_use_proxy_change(*args):

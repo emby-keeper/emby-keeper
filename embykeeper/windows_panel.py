@@ -6,7 +6,6 @@ import threading
 import time
 import webbrowser
 
-
 PANEL_URL = "http://127.0.0.1:8000/"
 
 
@@ -37,8 +36,15 @@ class PanelController:
                 config_file.touch(exist_ok=True)
 
             _run_server(
-                host="127.0.0.1", port=8000, target_host="127.0.0.1", target_port=8001,
-                autostart=True, reload=False, debug=False, cors=[], server_callback=self.set_server,
+                host="127.0.0.1",
+                port=8000,
+                target_host="127.0.0.1",
+                target_port=8001,
+                autostart=True,
+                reload=False,
+                debug=False,
+                cors=[],
+                server_callback=self.set_server,
             )
         except BaseException as exc:
             self.error = exc
@@ -111,7 +117,9 @@ def main():
 
     controller = PanelController()
     icon = pystray.Icon(
-        "embykeeper", image, "Embykeeper",
+        "embykeeper",
+        image,
+        "Embykeeper",
         pystray.Menu(
             pystray.MenuItem("Open Embykeeper", lambda: controller.open_panel(), default=True),
             pystray.MenuItem("Exit", lambda tray: tray.stop()),

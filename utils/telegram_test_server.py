@@ -12,7 +12,6 @@ from embykeeper.telegram.pyrogram import Client as PyroClient
 from embykeeper.telegram.telethon import TelethonUtils
 from embykeeper.telegram.session import API_ID, API_HASH, _test_dc_id, _test_dc_ip, _test_dc_port
 
-
 app = AsyncTyper()
 
 
