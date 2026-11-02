@@ -23,6 +23,11 @@ async def event_generator(
     shutdown_event = get_shutdown_event()
 
     try:
+        # Emit a comment frame immediately so the response headers are flushed
+        # through proxies (e.g. Vite dev proxy) instead of hanging until
+        # the first real event or heartbeat arrives.
+        yield ": connected\n\n"
+
         if initial_data:
             yield f"event: initial\ndata: {json.dumps(initial_data)}\n\n"
 

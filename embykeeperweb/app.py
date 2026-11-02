@@ -368,6 +368,13 @@ def run(
     wait: bool = False,
     prefix: str = typer.Option("", envvar="EK_BASE_PREFIX", help="Base URL prefix (e.g. /ek)"),
 ):
+    from embykeeperapi.auth import validate_webpass
+
+    try:
+        validate_webpass()
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
     app.config["args"] = ctx.args
     app.config["BASE_PREFIX"] = prefix.rstrip("/")
     set_static_url_path(app, app.config["BASE_PREFIX"])

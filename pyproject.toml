@@ -50,6 +50,7 @@ embykeeperapi = "embykeeperapi.app:cli"
 
 [tool.setuptools]
 zip-safe = false
+include-package-data = true
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
