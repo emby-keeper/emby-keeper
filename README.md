@@ -67,6 +67,8 @@ docker run -d --name embykeeper-panel \
 
 之后访问 `http://<服务器地址>:8000`, 即可在界面中完成 Telegram 登录、账号管理与任务配置.
 
+如果服务器或平台没有持久磁盘 (例如 Koyeb、Render 免费层), 加上 `-e EK_MONGODB='mongodb://用户名:密码@主机:27017/embykeeper'` 即可把配置、缓存与界面设置都保存在 MongoDB, 重新部署不会丢数据.
+
 **注意**: 由于近期 Telegram 风控等级上升, 请尽可能先使用服务器所在地区的代理在手机上先登陆一次, 再使用 Embykeeper.
 
 若您更习惯命令行模式, 可以使用旧版的 [Docker 部署](https://emby-keeper.github.io/guide/Linux-Docker-部署):

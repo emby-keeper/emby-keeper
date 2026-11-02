@@ -5,6 +5,7 @@
 #   3. 浏览器打开 http://<服务器地址>:8000
 #
 # 全部状态 (config.toml / cache.json / Telegram 会话 / 日志 / 面板自身设置) 都保存在 ./data.
+# 设置 EK_MONGODB 后改为全部保存在 MongoDB, 可以去掉下面的 volumes 挂载 (见 .env.example).
 # 旧版命令行 + 在线控制台部署, 请参考仓库根目录的 docs/guide/Linux-Docker-Compose-部署.md.
 
 services:
@@ -23,6 +24,8 @@ services:
       EMBYKEEPERAPI_BASEDIR: /app
       # 面板自身状态 (~/.embykeeper) 也落在同一目录, 便于整目录备份
       HOME: /app
+      # 设置后配置、缓存与面板设置全部保存在 MongoDB, 可去掉 volumes 挂载
+      EK_MONGODB: ${EK_MONGODB:-}
     ports:
       - "${EK_PANEL_PORT:-8000}:8000"
     volumes:

@@ -10,4 +10,7 @@ services:
     envVars:
       - key: EK_WEBPASS
         sync: false
+      # 免费层没有持久磁盘, 用 MongoDB 保存配置与登录状态
+      - key: EK_MONGODB
+        sync: false
     autoDeploy: true

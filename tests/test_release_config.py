@@ -211,7 +211,7 @@ class DockerReleaseTests(unittest.TestCase):
         for name, text in file_texts.items():
             with self.subTest(source=name):
                 self.assertIsNone(re.search(r"\bTZ\b", text))
-        self.assertIn('EK_WEBPASS: "your-password"', file_texts["guide"])
+        self.assertRegex(file_texts["guide"], r"""EK_WEBPASS: ['"]your-password['"]""")
         self.assertIn("EK_WEBPASS=your-password", file_texts["env"])
         self.assertIn("EK_WEBPASS='your-password'", (root / "README.md").read_text(encoding="utf-8"))
 

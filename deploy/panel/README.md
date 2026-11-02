@@ -53,6 +53,15 @@ deploy/panel/data/
 
 备份即打包该目录; 从旧版迁移时, 把旧数据目录 (`embykeeper/`) 的内容复制进来即可, 配置与会话文件完全兼容.
 
+设置 `EK_MONGODB` 后, 配置、缓存与面板自身状态都改存 MongoDB, 不再需要挂载 `data`:
+
+```bash
+EK_WEBPASS='your-password' EK_MONGODB='mongodb://用户名:密码@主机:27017/embykeeper' \
+  docker compose up -d
+```
+
+首次以数据库模式启动时, 若数据目录里存在旧的 `config.toml` 与 `cache.json`, 会一次性导入数据库, `cache.json` 改名为 `cache.json.migrated`; 之后删除 volumes 挂载也不会丢配置. 用户文档见 [用 MongoDB 无持久化部署](../../docs/guide/面板模式部署.md#用-mongodb-无持久化部署).
+
 ## 常用命令
 
 ```bash
@@ -71,6 +80,7 @@ docker compose pull && docker compose up -d  # 更新镜像并重启
 | `TZ` | `Asia/Shanghai` | 容器时区, 镜像已内置该默认值, 一般无需设置 |
 | `EMBYKEEPERAPI_BASEDIR` | `/app` | 业务配置与用户数据目录 (镜像内已设定) |
 | `EMBYKEEPERAPI_STATIC_DIR` | `/opt/embykeeper-panel/static` | 面板界面目录 (镜像内已设定) |
+| `EK_MONGODB` | (无) | MongoDB 连接字符串; 设置后配置、缓存与面板状态全部入库, 无需挂载数据目录 |
 
 ## 说明
 
