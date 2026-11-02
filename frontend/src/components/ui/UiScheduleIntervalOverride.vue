@@ -1,15 +1,22 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { formatIntervalValue, parseIntervalValue } from '@/utils/schedulerDisplay'
+import { formatIntervalValue, formatScheduleInterval, parseIntervalValue } from '@/utils/schedulerDisplay'
 
 const props = withDefaults(defineProps<{
   variant?: 'card' | 'plain'
   helperText?: string
-  label: string
+  label?: string
   modelValue?: string | null
+  globalValue?: string | null
+  globalLabel?: string
+  globalHint?: string
 }>(), {
   helperText: '',
+  label: '',
   modelValue: '',
+  globalValue: '',
+  globalLabel: '使用全局设置',
+  globalHint: '当前账号将跟随全局间隔天数',
   variant: 'card',
 })
 
@@ -29,6 +36,13 @@ const modeButtonClass = (value: 'global' | 'single' | 'range') => [
 ]
 
 const normalizedValue = computed(() => String(props.modelValue || '').trim())
+
+const globalDisplay = computed(() => {
+  const value = String(props.globalValue || '').trim()
+  if (!value) return ''
+  const formatted = formatScheduleInterval(value)
+  return formatted === '-' ? '' : formatted
+})
 
 const sanitizePositiveInteger = (value: string, fallback: string) => {
   const numeric = Number(value)
@@ -108,18 +122,18 @@ watch([start, end], ([nextStart, nextEnd]) => {
 <template>
   <div :class="props.variant === 'plain' ? 'space-y-4' : 'space-y-4 rounded-[22px] border border-slate-200 bg-slate-50 p-4 sm:p-5'">
     <div class="space-y-1.5">
-      <p class="text-sm font-medium text-slate-900">{{ label }}</p>
+      <p v-if="label" class="text-sm font-medium text-slate-900">{{ label }}</p>
       <p v-if="helperText" class="text-xs leading-5 text-slate-400">{{ helperText }}</p>
     </div>
 
     <div class="grid grid-cols-1 gap-1 rounded-[14px] bg-white p-1 ring-1 ring-inset ring-slate-200 sm:grid-cols-3">
-      <button type="button" :class="modeButtonClass('global')" @click="mode = 'global'">使用全局设置</button>
+      <button type="button" :class="modeButtonClass('global')" @click="mode = 'global'">{{ globalLabel }}</button>
       <button type="button" :class="modeButtonClass('single')" @click="mode = 'single'">固定天数</button>
       <button type="button" :class="modeButtonClass('range')" @click="mode = 'range'">区间天数</button>
     </div>
 
     <div v-if="mode === 'global'" class="rounded-[16px] border border-dashed border-slate-300 bg-white/70 px-4 py-3 text-sm text-slate-500">
-      当前账号将跟随全局间隔天数。
+      {{ globalHint }}<span v-if="globalDisplay">（全局：{{ globalDisplay }}）</span>。
     </div>
 
     <div v-else-if="mode === 'single'" class="grid gap-3 sm:max-w-[220px]">

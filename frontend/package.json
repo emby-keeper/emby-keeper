@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run typecheck && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test scripts/*.test.mjs",
     "preview": "vite preview --port 5173"
   },
   "dependencies": {

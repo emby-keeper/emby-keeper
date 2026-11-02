@@ -8,6 +8,7 @@ import {
 import UiButton from '@/components/ui/UiButton.vue'
 import UiCard from '@/components/ui/UiCard.vue'
 import UiSelect, { type UiSelectOption } from '@/components/ui/UiSelect.vue'
+import UiSiteScopeSelector from '@/components/ui/UiSiteScopeSelector.vue'
 import UiTooltip from '@/components/ui/UiTooltip.vue'
 import { useAuthStore } from '@/stores/auth'
 import { logger } from '@/utils/logger'
@@ -69,7 +70,78 @@ const schedulerForm = reactive({
   subsonic_interval_days: '<7,12>',
   subsonic_concurrency: 1,
   registrar_concurrency: 1,
+  site_checkiner: null as string[] | null,
+  site_monitor: null as string[] | null,
+  site_messager: null as string[] | null,
+  site_registrar: null as string[] | null,
 })
+
+const sitesLoading = ref(false)
+const siteNames = ref<{ checkiner: string[], monitor: string[], messager: string[], registrar: string[] }>({
+  checkiner: [],
+  monitor: [],
+  messager: [],
+  registrar: [],
+})
+const allSiteNames = ref<{ checkiner: string[], monitor: string[], messager: string[], registrar: string[] }>({
+  checkiner: [],
+  monitor: [],
+  messager: [],
+  registrar: [],
+})
+const siteDisplayNames = ref<{ checkiner: Record<string, string>, monitor: Record<string, string>, messager: Record<string, string>, registrar: Record<string, string> }>({
+  checkiner: {},
+  monitor: {},
+  messager: {},
+  registrar: {},
+})
+const customSiteNames = ref<{ checkiner: string[], monitor: string[], messager: string[], registrar: string[] }>({
+  checkiner: [],
+  monitor: [],
+  messager: [],
+  registrar: [],
+})
+
+const loadSiteNames = async () => {
+  sitesLoading.value = true
+  try {
+    const data = await auth.request<{
+      sites: Record<string, string[]>,
+      all_sites: Record<string, string[]>,
+      custom: Record<string, string[]>,
+      display_names: Record<string, Record<string, string>>,
+    }>('/telegram/sites')
+    siteNames.value = {
+      checkiner: data.sites?.checkiner || [],
+      monitor: data.sites?.monitor || [],
+      messager: data.sites?.messager || [],
+      registrar: data.sites?.registrar || [],
+    }
+    allSiteNames.value = {
+      checkiner: data.all_sites?.checkiner || [],
+      monitor: data.all_sites?.monitor || [],
+      messager: data.all_sites?.messager || [],
+      registrar: data.all_sites?.registrar || [],
+    }
+    customSiteNames.value = {
+      checkiner: data.custom?.checkiner || [],
+      monitor: data.custom?.monitor || [],
+      messager: data.custom?.messager || [],
+      registrar: data.custom?.registrar || [],
+    }
+    const displayNames = data.display_names || {}
+    siteDisplayNames.value = {
+      checkiner: displayNames.checkiner || {},
+      monitor: displayNames.monitor || {},
+      messager: displayNames.messager || {},
+      registrar: displayNames.registrar || {},
+    }
+  } catch (err) {
+    logger.error('Failed to load telegram sites', err)
+  } finally {
+    sitesLoading.value = false
+  }
+}
 
 const schedulerTimeForm = reactive({
   checkiner_start: '11:00',
@@ -108,9 +180,9 @@ const networkForm = reactive({
   telegram_use_proxy: true,
   proxy: {
     enabled: false,
-    scheme: 'socks5',
-    hostname: '',
-    port: 1080 as number | null,
+    scheme: 'http',
+    hostname: '127.0.0.1',
+    port: 7890 as number | null,
     username: '',
     password: '',
   },
@@ -183,7 +255,7 @@ const proxySchemeOptions = [
   { label: 'HTTP', value: 'http' },
 ]
 
-const tooltipButtonClass = 'inline-flex h-4 w-4 items-center justify-center rounded-full text-slate-400 transition hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2'
+const tooltipButtonClass = 'inline-flex h-6 w-6 -m-1 items-center justify-center rounded-full text-slate-400 transition hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2'
 
 const normalizeClockValue = (value: string): string | null => {
   const trimmed = value.trim()
@@ -542,13 +614,14 @@ Promise.all([
   loadSection('scheduler'),
   loadSection('network'),
   loadNotifierAccounts(),
+  loadSiteNames(),
 ])
 </script>
 
 <template>
-  <div class="space-y-8">
+  <div class="space-y-8" :class="{ 'pb-44 sm:pb-28': hasDirtySections }">
     <section class="overflow-hidden rounded-[30px] border border-slate-200/80 bg-gradient-to-br from-white via-slate-50 to-slate-100 shadow-[0_20px_60px_-32px_rgba(15,23,42,0.35)]">
-      <div class="flex flex-col gap-6 px-6 py-7 sm:px-8">
+      <div class="flex min-w-0 flex-col gap-4 px-4 py-5 sm:px-6 sm:py-6 xl:px-8">
         <div class="max-w-2xl space-y-2">
           <p class="text-xs font-semibold uppercase tracking-[0.22em] text-primary-600">System Settings</p>
           <div>
@@ -559,7 +632,7 @@ Promise.all([
       </div>
     </section>
 
-    <section class="grid gap-6 md:grid-cols-2">
+    <section class="grid min-w-0 grid-cols-1 gap-6 2xl:grid-cols-2">
       <section id="basic" class="scroll-mt-6">
       <UiCard class="h-full overflow-hidden border-slate-200/70 bg-white/90">
         <template #header>
@@ -659,7 +732,7 @@ Promise.all([
       </UiCard>
       </section>
 
-      <section id="scheduler" class="scroll-mt-6 xl:col-span-2">
+      <section id="scheduler" class="scroll-mt-6 2xl:col-span-2">
       <UiCard class="relative z-10 overflow-hidden border-slate-200/70 bg-white/90 focus-within:z-20">
         <template #header>
           <div class="flex items-center justify-between gap-4">
@@ -971,18 +1044,78 @@ Promise.all([
                 </label>
               </div>
             </div>
+
+            <div :class="schedulerPanelClass">
+              <div class="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <h3 class="text-base font-semibold text-slate-950">站点范围</h3>
+                  <p class="mt-1 text-sm text-slate-500">系统默认的站点范围，账号未单独指定时会沿用这里的设置。</p>
+                </div>
+                <UiButton size="sm" variant="secondary" :loading="sitesLoading" @click="loadSiteNames">
+                  刷新站点
+                </UiButton>
+              </div>
+              <div class="grid gap-5">
+                <UiSiteScopeSelector
+                  v-model="schedulerForm.site_checkiner"
+                  label="签到站点"
+                  helper-text="参与签到任务的站点。"
+                  :sites="siteNames.checkiner"
+                  :all-sites="allSiteNames.checkiner"
+                  :extra-sites="customSiteNames.checkiner"
+                  :display-names="siteDisplayNames.checkiner"
+                  site-type="checkiner"
+                />
+                <div class="border-t border-slate-200 pt-5">
+                  <UiSiteScopeSelector
+                    v-model="schedulerForm.site_monitor"
+                    label="监控站点"
+                    helper-text="参与监控任务的站点。"
+                    :sites="siteNames.monitor"
+                    :all-sites="allSiteNames.monitor"
+                    :extra-sites="customSiteNames.monitor"
+                    :display-names="siteDisplayNames.monitor"
+                    site-type="monitor"
+                  />
+                </div>
+                <div class="border-t border-slate-200 pt-5">
+                  <UiSiteScopeSelector
+                    v-model="schedulerForm.site_messager"
+                    label="水群站点"
+                    helper-text="参与水群任务的站点。"
+                    :sites="siteNames.messager"
+                    :all-sites="allSiteNames.messager"
+                    :extra-sites="customSiteNames.messager"
+                    :display-names="siteDisplayNames.messager"
+                    site-type="messager"
+                  />
+                </div>
+                <div class="border-t border-slate-200 pt-5">
+                  <UiSiteScopeSelector
+                    v-model="schedulerForm.site_registrar"
+                    label="抢注站点"
+                    helper-text="参与抢注任务的站点。"
+                    :sites="siteNames.registrar"
+                    :all-sites="allSiteNames.registrar"
+                    :extra-sites="customSiteNames.registrar"
+                    :display-names="siteDisplayNames.registrar"
+                    site-type="registrar"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </UiCard>
       </section>
 
-      <section id="network" class="scroll-mt-6 xl:col-span-2">
+      <section id="network" class="scroll-mt-6 2xl:col-span-2">
       <UiCard class="overflow-hidden border-slate-200/70 bg-white/90">
         <template #header>
           <div class="flex items-center justify-between gap-4">
             <div>
               <h2 class="text-lg font-semibold tracking-tight text-slate-950">网络代理</h2>
-              <p class="mt-1 text-sm text-slate-500">{{ proxySummary }}</p>
+              <p class="mt-1 break-all text-sm text-slate-500">{{ proxySummary }}</p>
               <p v-if="loadError.network" class="mt-2 text-sm font-medium text-rose-600">{{ loadError.network }}</p>
             </div>
             <UiButton size="md" class="min-w-[88px]" :variant="getSaveButtonVariant('network')" :disabled="isSaveButtonDisabled('network')" :loading="saving.network" @click="saveSection('network')">
@@ -1004,7 +1137,7 @@ Promise.all([
             </label>
             <label class="space-y-2 text-sm text-slate-600">
               <span class="font-medium text-slate-900">端口</span>
-              <input v-model.number="networkForm.proxy.port" :disabled="!networkForm.proxy.enabled" type="number" min="1" class="block w-full rounded-[18px] border-0 bg-slate-50 px-4 py-3 text-slate-900 ring-1 ring-inset ring-slate-200 disabled:bg-slate-100 focus:ring-2 focus:ring-primary-600" placeholder="1080" />
+              <input v-model.number="networkForm.proxy.port" :disabled="!networkForm.proxy.enabled" type="number" min="1" class="block w-full rounded-[18px] border-0 bg-slate-50 px-4 py-3 text-slate-900 ring-1 ring-inset ring-slate-200 disabled:bg-slate-100 focus:ring-2 focus:ring-primary-600" placeholder="7890" />
             </label>
             <label class="space-y-2 text-sm text-slate-600 xl:col-span-2">
               <span class="font-medium text-slate-900">用户名</span>
@@ -1034,13 +1167,13 @@ Promise.all([
       leave-from-class="translate-y-0 opacity-100"
       leave-to-class="translate-y-4 opacity-0"
     >
-        <div v-if="hasDirtySections" class="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex justify-center px-4 lg:left-72">
-        <div class="pointer-events-auto flex w-full max-w-3xl items-center justify-between gap-4 rounded-[24px] border border-primary-200 bg-white/95 px-5 py-4 shadow-[0_24px_60px_-24px_rgba(37,99,235,0.35)] backdrop-blur sm:px-6">
+        <div v-if="hasDirtySections" class="pointer-events-none fixed inset-x-0 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 flex justify-center px-3 xl:left-72">
+        <div class="pointer-events-auto flex w-full max-w-3xl flex-col gap-3 rounded-[24px] border border-primary-200 bg-white/95 px-4 py-3 shadow-[0_24px_60px_-24px_rgba(37,99,235,0.35)] backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
           <div class="min-w-0">
             <p class="text-sm font-semibold text-slate-950">有 {{ dirtySectionCount }} 项设置尚未保存</p>
             <p class="mt-1 truncate text-sm text-slate-500">已修改：{{ dirtySectionSummary }}</p>
           </div>
-          <div class="flex shrink-0 items-center gap-3">
+          <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
             <UiButton size="md" variant="outline" :disabled="isAnySectionSaving" @click="revertAllDirtySections">
               撤销修改
             </UiButton>

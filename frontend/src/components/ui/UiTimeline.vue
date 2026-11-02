@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{
+const props = defineProps<{
   items: Array<{
     time?: string
     title: string
@@ -7,38 +7,30 @@ defineProps<{
     type?: 'default' | 'success' | 'error' | 'warning'
   }>
 }>()
+
+const shortTime = (value?: string) => (value ? value.slice(-8) : '')
+
+const styles = (type?: string) => {
+  switch (type) {
+    case 'error': return { dot: 'bg-red-500', level: 'text-red-600' }
+    case 'warning': return { dot: 'bg-yellow-500', level: 'text-yellow-700' }
+    case 'success': return { dot: 'bg-green-500', level: 'text-green-600' }
+    default: return { dot: 'bg-gray-400', level: 'text-slate-500' }
+  }
+}
 </script>
 
 <template>
-  <div class="flow-root">
-    <ul role="list" class="-mb-8">
-      <li v-for="(item, index) in items" :key="index">
-        <div class="relative pb-8">
-          <span v-if="index !== items.length - 1" class="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true" />
-          <div class="relative flex space-x-3">
-            <div>
-              <span :class="[
-                'h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white',
-                item.type === 'error' ? 'bg-red-500' :
-                item.type === 'warning' ? 'bg-yellow-500' :
-                item.type === 'success' ? 'bg-green-500' :
-                'bg-gray-400'
-              ]">
-                <div class="h-2.5 w-2.5 rounded-full bg-white" />
-              </span>
-            </div>
-            <div class="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
-              <div>
-                <p class="text-sm text-gray-900 font-medium">{{ item.title }}</p>
-                <p v-if="item.description" class="mt-1 flex items-center text-sm text-gray-500">{{ item.description }}</p>
-              </div>
-              <div v-if="item.time" class="whitespace-nowrap text-right text-sm text-gray-500">
-                <time>{{ item.time }}</time>
-              </div>
-            </div>
-          </div>
-        </div>
-      </li>
-    </ul>
+  <div class="space-y-1">
+    <div
+      v-for="(item, index) in items"
+      :key="index"
+      class="flex items-start gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-slate-50"
+    >
+      <span class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full" :class="styles(item.type).dot" />
+      <span class="shrink-0 pt-px font-mono text-xs leading-5 tabular-nums text-slate-400">{{ shortTime(item.time) }}</span>
+      <span class="w-14 shrink-0 pt-px text-xs font-semibold leading-5" :class="styles(item.type).level">{{ item.description || 'INFO' }}</span>
+      <p class="min-w-0 flex-1 pt-px text-sm leading-5 text-slate-700">{{ item.title }}</p>
+    </div>
   </div>
 </template>

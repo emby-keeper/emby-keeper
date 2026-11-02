@@ -15,6 +15,7 @@ const props = withDefaults(defineProps<{
 	label?: string
 	disabled?: boolean
 	placeholder?: string
+	ariaLabel?: string
 }>(), {
 	disabled: false,
 	placeholder: '请选择',
@@ -43,8 +44,9 @@ const updateValue = (value: string) => {
 			</ListboxLabel>
 			<div class="relative">
 				<ListboxButton
+					:aria-label="ariaLabel"
 					:class="[
-						'relative w-full rounded-[18px] border-0 bg-slate-50 py-3 pl-4 pr-11 text-left text-sm text-slate-900 ring-1 ring-inset ring-slate-200 transition focus:outline-none focus:ring-2 focus:ring-primary-600',
+						'relative w-full min-w-0 rounded-[18px] border-0 bg-slate-50 py-2.5 pl-3 pr-9 text-left text-sm text-slate-900 ring-1 ring-inset ring-slate-200 transition focus:outline-none focus:ring-2 focus:ring-primary-600 sm:py-3 sm:pl-4 sm:pr-11',
 						disabled ? 'cursor-not-allowed bg-slate-100 text-slate-400' : 'cursor-pointer',
 					]"
 				>

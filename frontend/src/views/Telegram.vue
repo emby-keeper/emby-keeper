@@ -1,15 +1,24 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ChatBubbleLeftRightIcon, ChevronDownIcon, InformationCircleIcon, MagnifyingGlassIcon, PencilSquareIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import UiCard from '@/components/ui/UiCard.vue'
 import UiBadge from '@/components/ui/UiBadge.vue'
 import UiButton from '@/components/ui/UiButton.vue'
 import UiDrawer from '@/components/ui/UiDrawer.vue'
 import UiSelect, { type UiSelectOption } from '@/components/ui/UiSelect.vue'
+import UiSiteScopeSelector from '@/components/ui/UiSiteScopeSelector.vue'
 import Switch from '@/components/Switch.vue'
 import UiTooltip from '@/components/ui/UiTooltip.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { logger } from '@/utils/logger'
+
+type TelegramSiteConfig = {
+  checkiner?: string[] | null
+  monitor?: string[] | null
+  messager?: string[] | null
+  registrar?: string[] | null
+}
 
 type TelegramAccountItem = {
   phone: string
@@ -22,6 +31,7 @@ type TelegramAccountItem = {
   api_id?: string | null
   api_hash?: string | null
   session?: string | null
+  site?: TelegramSiteConfig | null
   site_override?: boolean
   checkiner_config_override?: boolean
   registrar_config_override?: boolean
@@ -39,6 +49,10 @@ type TelegramForm = {
   api_id: string
   api_hash: string
   session: string
+  site_checkiner: string[] | null
+  site_monitor: string[] | null
+  site_messager: string[] | null
+  site_registrar: string[] | null
 }
 
 const auth = useAuthStore()
@@ -68,8 +82,43 @@ const detailOpen = ref(false)
 const currentAccount = ref<TelegramAccountItem | null>(null)
 const formMode = ref<'create' | 'edit'>('create')
 const formError = ref('')
+const formErrorElement = ref<HTMLElement | null>(null)
 const pageError = ref('')
+const testStarting = ref(false)
+const testSubmitting = ref(false)
+const testSubmitted = ref(false)
+const testResult = ref<{ success: boolean, message: string } | null>(null)
+const testLoginId = ref('')
+const testCode = ref('')
+const testPhase = ref<'idle' | 'code' | 'password' | 'done'>('idle')
+const testPolling = ref(false)
+let testPollTimer: ReturnType<typeof setInterval> | null = null
 const connectionInfoOpen = ref(false)
+const sitesLoading = ref(false)
+const siteNames = ref<{ checkiner: string[], monitor: string[], messager: string[], registrar: string[] }>({
+  checkiner: [],
+  monitor: [],
+  messager: [],
+  registrar: [],
+})
+const allSiteNames = ref<{ checkiner: string[], monitor: string[], messager: string[], registrar: string[] }>({
+  checkiner: [],
+  monitor: [],
+  messager: [],
+  registrar: [],
+})
+const siteDisplayNames = ref<{ checkiner: Record<string, string>, monitor: Record<string, string>, messager: Record<string, string>, registrar: Record<string, string> }>({
+  checkiner: {},
+  monitor: {},
+  messager: {},
+  registrar: {},
+})
+const customSiteNames = ref<{ checkiner: string[], monitor: string[], messager: string[], registrar: string[] }>({
+  checkiner: [],
+  monitor: [],
+  messager: [],
+  registrar: [],
+})
 const form = ref<TelegramForm>({
   phone: '',
   enabled: true,
@@ -80,7 +129,13 @@ const form = ref<TelegramForm>({
   api_id: '',
   api_hash: '',
   session: '',
+  site_checkiner: null,
+  site_monitor: null,
+  site_messager: null,
+  site_registrar: null,
 })
+
+const { model: drawerModel } = useUnsavedChanges(drawerOpen, () => form.value, saving)
 
 const filteredAccounts = computed(() => {
   const keyword = search.value.trim().toLowerCase()
@@ -149,8 +204,53 @@ const applyForm = (account?: TelegramAccountItem | null) => {
     api_id: account?.api_id || '',
     api_hash: account?.api_hash || '',
     session: account?.session || '',
+    site_checkiner: account?.site?.checkiner ?? null,
+    site_monitor: account?.site?.monitor ?? null,
+    site_messager: account?.site?.messager ?? null,
+    site_registrar: account?.site?.registrar ?? null,
   }
   connectionInfoOpen.value = Boolean(account?.api_id || account?.api_hash || account?.session)
+}
+
+const loadSiteNames = async () => {
+  sitesLoading.value = true
+  try {
+    const data = await auth.request<{
+      sites: Record<string, string[]>,
+      all_sites: Record<string, string[]>,
+      custom: Record<string, string[]>,
+      display_names: Record<string, Record<string, string>>,
+    }>('/telegram/sites')
+    siteNames.value = {
+      checkiner: data.sites?.checkiner || [],
+      monitor: data.sites?.monitor || [],
+      messager: data.sites?.messager || [],
+      registrar: data.sites?.registrar || [],
+    }
+    allSiteNames.value = {
+      checkiner: data.all_sites?.checkiner || [],
+      monitor: data.all_sites?.monitor || [],
+      messager: data.all_sites?.messager || [],
+      registrar: data.all_sites?.registrar || [],
+    }
+    customSiteNames.value = {
+      checkiner: data.custom?.checkiner || [],
+      monitor: data.custom?.monitor || [],
+      messager: data.custom?.messager || [],
+      registrar: data.custom?.registrar || [],
+    }
+    const displayNames = data.display_names || {}
+    siteDisplayNames.value = {
+      checkiner: displayNames.checkiner || {},
+      monitor: displayNames.monitor || {},
+      messager: displayNames.messager || {},
+      registrar: displayNames.registrar || {},
+    }
+  } catch (error) {
+    logger.error('Failed to load telegram sites', error)
+  } finally {
+    sitesLoading.value = false
+  }
 }
 
 const syncConnectionInfoOpen = (event: Event) => {
@@ -207,6 +307,8 @@ const updateTelegramModule = (
 const openCreateDrawer = () => {
   formMode.value = 'create'
   formError.value = ''
+  testResult.value = null
+  resetTestState()
   applyForm(null)
   drawerOpen.value = true
 }
@@ -214,6 +316,8 @@ const openCreateDrawer = () => {
 const openEditDrawer = (account: TelegramAccountItem) => {
   formMode.value = 'edit'
   formError.value = ''
+  testResult.value = null
+  resetTestState()
   currentAccount.value = account
   applyForm(account)
   drawerOpen.value = true
@@ -231,28 +335,76 @@ const openDetailDrawer = async (account: TelegramAccountItem) => {
   }
 }
 
-const submitForm = async () => {
-  saving.value = true
-  formError.value = ''
+const validateForm = () => {
+  const errors: string[] = []
 
   if (!form.value.phone.trim()) {
-    formError.value = '请输入手机号'
-    saving.value = false
-    return
+    errors.push('请输入手机号')
   }
 
   if (!form.value.checkiner && !form.value.monitor && !form.value.messager && !form.value.registrar) {
-    formError.value = '至少启用一个功能开关'
-    saving.value = false
-    return
+    errors.push('至少启用一个功能开关')
   }
 
-  const payload = {
-    ...form.value,
+  if (errors.length) {
+    formError.value = errors[0]
+    scrollFormErrorIntoView()
+    return false
+  }
+
+  return true
+}
+
+const scrollFormErrorIntoView = async () => {
+  await nextTick()
+  formErrorElement.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+const resetTestState = () => {
+  if (testPollTimer) {
+    clearInterval(testPollTimer)
+    testPollTimer = null
+  }
+  testLoginId.value = ''
+  testCode.value = ''
+  testPhase.value = 'idle'
+  testPolling.value = false
+  testStarting.value = false
+  testSubmitting.value = false
+  testSubmitted.value = false
+}
+
+const buildSitePayload = () => {
+  const site: Record<string, string[]> = {}
+  if (form.value.site_checkiner !== null) site.checkiner = form.value.site_checkiner
+  if (form.value.site_monitor !== null) site.monitor = form.value.site_monitor
+  if (form.value.site_messager !== null) site.messager = form.value.site_messager
+  if (form.value.site_registrar !== null) site.registrar = form.value.site_registrar
+  return Object.keys(site).length ? site : null
+}
+
+const buildFormPayload = () => {
+  return {
+    phone: form.value.phone,
+    enabled: form.value.enabled,
+    checkiner: form.value.checkiner,
+    monitor: form.value.monitor,
+    messager: form.value.messager,
+    registrar: form.value.registrar,
     api_id: form.value.api_id || null,
     api_hash: form.value.api_hash || null,
     session: form.value.session || null,
+    site: buildSitePayload(),
   }
+}
+
+const submitForm = async () => {
+  if (!validateForm()) return
+
+  saving.value = true
+  formError.value = ''
+
+  const payload = buildFormPayload()
 
   try {
     if (formMode.value === 'create') {
@@ -278,6 +430,128 @@ const submitForm = async () => {
   }
 }
 
+const pollTestResult = async () => {
+  if (!testLoginId.value) return
+  try {
+    const data = await auth.request(`/telegram/accounts/test/result?login_id=${testLoginId.value}`)
+    if (data.state === 'connecting') {
+      testResult.value = { success: false, message: data.message || '正在连接 Telegram 服务器…' }
+    } else if (data.state === 'waiting_code') {
+      testPhase.value = 'code'
+      testResult.value = { success: false, message: data.message || '验证码已发送到手机上的 Telegram，请查收后输入。' }
+      testStarting.value = false
+      if (!testSubmitted.value) {
+        stopTestPolling()
+      }
+    } else if (data.state === 'need_password') {
+      const passwordSubmitted = testSubmitted.value && testPhase.value === 'password'
+      testPhase.value = 'password'
+      testResult.value = { success: false, message: data.message || '该账号启用了两步验证，请输入密码。' }
+      testStarting.value = false
+      if (!passwordSubmitted) {
+        testSubmitted.value = false
+        stopTestPolling()
+      }
+    } else if (data.state === 'code_error') {
+      testResult.value = { success: false, message: data.message || '验证码错误，请重新输入。' }
+      testSubmitted.value = false
+      stopTestPolling()
+    } else if (data.state === 'password_error') {
+      testResult.value = { success: false, message: data.message || '密码错误，请重新输入。' }
+      testSubmitted.value = false
+      stopTestPolling()
+    } else if (data.state === 'done') {
+      testPhase.value = 'done'
+      testResult.value = { success: Boolean(data.success), message: data.message || (data.success ? '连接成功' : '连接失败') }
+      if (data.success && data.session) {
+        form.value.session = data.session
+      }
+      testSubmitted.value = false
+      stopTestPolling()
+    } else if (data.state === 'failed') {
+      testPhase.value = 'done'
+      testResult.value = { success: false, message: data.message || '登录失败' }
+      testSubmitted.value = false
+      stopTestPolling()
+    }
+  } catch (error) {
+    logger.error('Failed to poll telegram test result', error)
+    testSubmitted.value = false
+    stopTestPolling()
+    testResult.value = { success: false, message: logger.message(error, '测试失败') }
+  }
+}
+
+const stopTestPolling = () => {
+  if (testPollTimer) {
+    clearInterval(testPollTimer)
+    testPollTimer = null
+  }
+  testPolling.value = false
+  testStarting.value = false
+  testSubmitting.value = false
+  testSubmitted.value = false
+}
+
+const startTestPolling = () => {
+  testPolling.value = true
+  if (testPollTimer) clearInterval(testPollTimer)
+  testPollTimer = setInterval(pollTestResult, 2000)
+}
+
+const submitTestCode = async () => {
+  if (!testCode.value.trim()) {
+    testResult.value = { success: false, message: '请输入验证码或密码。' }
+    return
+  }
+  testSubmitting.value = true
+  testSubmitted.value = true
+  testResult.value = null
+  try {
+    await auth.request(`/telegram/accounts/test/code?login_id=${testLoginId.value}&code=${encodeURIComponent(testCode.value.trim())}&kind=${testPhase.value === 'password' ? 'password' : 'code'}`, {
+      method: 'POST',
+    })
+    testCode.value = ''
+    startTestPolling()
+  } catch (error) {
+    logger.error('Failed to submit telegram test code', error)
+    testSubmitting.value = false
+    testSubmitted.value = false
+    testResult.value = { success: false, message: logger.message(error, '提交失败') }
+  }
+}
+
+const startFormTestRun = async () => {
+  if (!validateForm()) return
+
+  resetTestState()
+  testStarting.value = true
+  testResult.value = null
+
+  try {
+    const data = await auth.request('/telegram/accounts/test', {
+      method: 'POST',
+      body: JSON.stringify(buildFormPayload()),
+    })
+    if (data.needs_code && data.login_id) {
+      testLoginId.value = data.login_id
+      testPhase.value = 'idle'
+      testResult.value = { success: false, message: '正在连接 Telegram 服务器…' }
+      startTestPolling()
+      return
+    }
+    testStarting.value = false
+    testResult.value = {
+      success: Boolean(data.success),
+      message: data.message || (data.success ? '连接成功' : '连接失败'),
+    }
+  } catch (error) {
+    logger.error('Failed to test telegram account', error)
+    testStarting.value = false
+    testResult.value = { success: false, message: logger.message(error, '测试失败') }
+  }
+}
+
 const deleteAccount = async (account: TelegramAccountItem) => {
   deleting.value = account.phone
   pageError.value = ''
@@ -299,13 +573,24 @@ const deleteAccount = async (account: TelegramAccountItem) => {
 
 onMounted(() => {
   fetchAccounts()
+  loadSiteNames()
+})
+
+watch(drawerOpen, (open) => {
+  if (!open) {
+    resetTestState()
+  }
+})
+
+onBeforeUnmount(() => {
+  resetTestState()
 })
 </script>
 
 <template>
   <div class="space-y-8">
     <section class="overflow-hidden rounded-[30px] border border-sky-200/70 bg-gradient-to-br from-sky-50 via-white to-cyan-50 shadow-[0_24px_80px_-40px_rgba(14,116,144,0.35)]">
-      <div class="flex flex-col gap-8 px-6 py-7 sm:px-8 md:flex-row md:items-end md:justify-between">
+      <div class="px-4 py-5 sm:px-6 sm:py-6 xl:px-8">
         <div class="space-y-3">
           <div class="inline-flex items-center gap-2 rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-sky-700 ring-1 ring-sky-200">
             <ChatBubbleLeftRightIcon class="h-4 w-4" aria-hidden="true" />
@@ -316,16 +601,8 @@ onMounted(() => {
             <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">管理签到、监控、水群和抢注相关的 Telegram 账号。</p>
           </div>
         </div>
-        <div class="grid min-w-[320px] gap-4 md:min-w-[640px] md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-          <div class="rounded-[24px] border border-white/80 bg-white/80 px-5 py-4 shadow-sm ring-1 ring-sky-100">
-            <div class="flex items-center justify-between gap-3">
-              <div>
-                <p class="text-xs uppercase tracking-[0.18em] text-slate-400">全局功能开关</p>
-                <p class="mt-2 text-sm text-slate-500">分别控制签到、监控、水群和抢注是否参与运行。</p>
-              </div>
-              <p class="text-sm text-slate-500">共 {{ summary.total }} 个账号</p>
-            </div>
-            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+        <div class="mt-6 rounded-[24px] border border-white/80 bg-white/80 px-5 py-4 shadow-sm ring-1 ring-sky-100">
+            <div class="grid gap-3 md:grid-cols-2">
               <div class="flex items-center justify-between gap-3 rounded-[18px] bg-white px-4 py-3 ring-1 ring-slate-200">
                 <div>
                   <p class="text-sm font-medium text-slate-900">签到</p>
@@ -350,43 +627,11 @@ onMounted(() => {
               <div class="flex items-center justify-between gap-3 rounded-[18px] bg-white px-4 py-3 ring-1 ring-slate-200">
                 <div>
                   <p class="text-sm font-medium text-slate-900">抢注</p>
-                  <p class="mt-1 text-xs text-slate-500">控制用户名抢注任务是否启用</p>
+                  <p class="mt-1 text-xs text-slate-500">控制账号抢注任务是否启用</p>
                 </div>
                 <Switch :model-value="summary.registrar_enabled" :disabled="moduleSaving" size="sm" @change="updateTelegramModule('registrar_enabled', $event)" />
               </div>
             </div>
-          </div>
-          <div class="rounded-[24px] border border-white/80 bg-white/80 px-5 py-4 shadow-sm ring-1 ring-sky-100">
-            <p class="text-xs uppercase tracking-[0.18em] text-slate-400">运行概览</p>
-            <div class="mt-4 grid gap-3 sm:grid-cols-2">
-              <div>
-                <p class="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">已启用账号</p>
-                <p class="mt-1 text-2xl font-semibold text-slate-950">{{ summary.enabled }}</p>
-              </div>
-              <div>
-                <p class="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">统一代理</p>
-                <p class="mt-1 text-sm font-semibold text-slate-950">{{ summary.use_proxy ? '已启用' : '未启用' }}</p>
-              </div>
-            </div>
-            <div class="mt-4 grid gap-3 sm:grid-cols-2">
-              <div>
-                <p class="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">签到账号</p>
-                <p class="mt-1 text-sm font-semibold text-slate-950">{{ summary.checkiner }}</p>
-              </div>
-              <div>
-                <p class="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">监控账号</p>
-                <p class="mt-1 text-sm font-semibold text-slate-950">{{ summary.monitor }}</p>
-              </div>
-              <div>
-                <p class="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">水群账号</p>
-                <p class="mt-1 text-sm font-semibold text-slate-950">{{ summary.messager }}</p>
-              </div>
-              <div>
-                <p class="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">抢注账号</p>
-                <p class="mt-1 text-sm font-semibold text-slate-950">{{ summary.registrar }}</p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </section>
@@ -398,7 +643,7 @@ onMounted(() => {
             <h2 class="text-lg font-semibold tracking-tight text-slate-950">账号列表</h2>
             <p class="mt-1 text-sm text-slate-500">按账号查看当前启用模块。</p>
           </div>
-          <div class="flex items-center gap-3">
+          <div class="flex shrink-0 flex-wrap items-center gap-2">
             <div class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500 ring-1 ring-slate-200">
               共 {{ filteredAccounts.length }} / {{ accounts.length }} 个账号
             </div>
@@ -410,18 +655,18 @@ onMounted(() => {
         </div>
       </template>
 
-      <div class="rounded-[26px] border border-slate-200/70 bg-slate-50/80 p-5 sm:p-6">
+      <div class="min-w-0 rounded-[26px] border border-slate-200/70 bg-slate-50/80 p-3 sm:p-4">
 
-    <div class="mb-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_180px]">
-      <div class="relative">
+    <div class="mb-5 grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-[minmax(0,1fr)_180px_180px]">
+      <div class="relative col-span-2 min-w-0 lg:col-span-1">
         <label for="telegram-search" class="sr-only">搜索账号</label>
         <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
           <MagnifyingGlassIcon class="h-5 w-5 text-gray-400" />
         </div>
         <input id="telegram-search" v-model="search" type="text" placeholder="搜索手机号、API ID" class="block w-full rounded-[18px] border-0 bg-white py-3 pl-10 pr-4 text-slate-900 ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-600" />
       </div>
-      <UiSelect v-model="statusFilter" :options="statusFilterOptions" class="w-full" />
-      <UiSelect v-model="checkinResultFilter" :options="checkinResultFilterOptions" class="w-full" />
+      <UiSelect v-model="statusFilter" :options="statusFilterOptions" aria-label="筛选账号状态" class="min-w-0 w-full" />
+      <UiSelect v-model="checkinResultFilter" :options="checkinResultFilterOptions" aria-label="筛选签到结果" class="min-w-0 w-full" />
     </div>
 
     <div v-if="pageError" class="mb-4 rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -442,15 +687,15 @@ onMounted(() => {
       <p class="mt-2 text-sm text-slate-500">调整筛选条件或新增账号后再试。</p>
     </div>
 
-    <div v-else class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div v-else class="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
       <UiCard v-for="account in filteredAccounts" :key="account.phone" hover>
         <div class="flex items-start justify-between gap-4 mb-4">
-          <div class="flex items-center gap-3">
-            <div class="flex h-12 w-12 items-center justify-center rounded-[20px] bg-gradient-to-br from-sky-500 to-cyan-500 shadow-lg shadow-sky-500/20">
+          <div class="flex min-w-0 flex-1 items-center gap-3">
+            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-[20px] bg-gradient-to-br from-sky-500 to-cyan-500 shadow-lg shadow-sky-500/20">
               <ChatBubbleLeftRightIcon class="w-6 h-6 text-white" />
             </div>
             <div>
-              <div class="font-semibold text-slate-900">{{ account.masked_phone || account.phone }}</div>
+              <div class="break-all font-semibold text-slate-900">{{ account.masked_phone || account.phone }}</div>
               <div class="mt-0.5 text-xs text-slate-500">Telegram</div>
             </div>
           </div>
@@ -490,9 +735,9 @@ onMounted(() => {
       </div>
     </UiCard>
 
-    <UiDrawer v-model="drawerOpen" :title="drawerTitle">
+    <UiDrawer v-model="drawerModel" :title="drawerTitle">
       <div class="space-y-6">
-        <div v-if="formError" class="rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div v-if="formError" ref="formErrorElement" class="rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           {{ formError }}
         </div>
 
@@ -574,11 +819,76 @@ onMounted(() => {
         </UiCard>
 
         <UiCard>
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h3 class="text-base font-semibold text-slate-950">站点范围</h3>
+              <p class="mt-1 text-sm text-slate-500">指定这个账号参与哪些站点；未单独指定的模块会沿用系统设置。</p>
+            </div>
+            <UiButton size="sm" variant="secondary" :loading="sitesLoading" @click="loadSiteNames">
+              刷新站点
+            </UiButton>
+          </div>
+
+          <div class="mt-4 space-y-5">
+            <UiSiteScopeSelector
+              v-model="form.site_checkiner"
+              label="签到站点"
+              helper-text="这个账号要签到的站点。"
+              :sites="siteNames.checkiner"
+              :all-sites="allSiteNames.checkiner"
+              :extra-sites="customSiteNames.checkiner"
+              :display-names="siteDisplayNames.checkiner"
+              site-type="checkiner"
+              allow-inherit
+            />
+            <div class="border-t border-slate-200 pt-5">
+              <UiSiteScopeSelector
+                v-model="form.site_monitor"
+                label="监控站点"
+                helper-text="这个账号要监控的站点。"
+                :sites="siteNames.monitor"
+                :all-sites="allSiteNames.monitor"
+                :extra-sites="customSiteNames.monitor"
+                :display-names="siteDisplayNames.monitor"
+                site-type="monitor"
+                allow-inherit
+              />
+            </div>
+            <div class="border-t border-slate-200 pt-5">
+              <UiSiteScopeSelector
+                v-model="form.site_messager"
+                label="水群站点"
+                helper-text="这个账号要参与水群的站点。"
+                :sites="siteNames.messager"
+                :all-sites="allSiteNames.messager"
+                :extra-sites="customSiteNames.messager"
+                :display-names="siteDisplayNames.messager"
+                site-type="messager"
+                allow-inherit
+              />
+            </div>
+            <div class="border-t border-slate-200 pt-5">
+              <UiSiteScopeSelector
+                v-model="form.site_registrar"
+                label="抢注站点"
+                helper-text="这个账号要参与抢注的站点。"
+                :sites="siteNames.registrar"
+                :all-sites="allSiteNames.registrar"
+                :extra-sites="customSiteNames.registrar"
+                :display-names="siteDisplayNames.registrar"
+                site-type="registrar"
+                allow-inherit
+              />
+            </div>
+          </div>
+        </UiCard>
+
+        <UiCard>
           <details :open="connectionInfoOpen" class="group" @toggle="syncConnectionInfoOpen">
             <summary class="flex cursor-pointer list-none items-start justify-between gap-4 rounded-[18px] bg-slate-50 px-4 py-4 [&::-webkit-details-marker]:hidden">
               <div>
                 <h3 class="text-base font-semibold text-slate-950">连接信息</h3>
-                <p class="mt-1 text-sm text-slate-500">API ID、API Hash 和 Session 按需填写，不需要时可以保持收起。</p>
+                <p class="mt-1 text-sm text-slate-500">仅在遇到问题时才需要填写（例如登录失败、频繁掉线等），平时可以保持收起。</p>
               </div>
               <span class="inline-flex items-center gap-2 text-sm font-medium text-slate-500">
                 <span>{{ connectionInfoOpen ? '收起' : '展开' }}</span>
@@ -603,11 +913,36 @@ onMounted(() => {
           </details>
         </UiCard>
 
-        <div class="flex justify-end gap-3">
-          <UiButton variant="outline" @click="drawerOpen = false">取消</UiButton>
+        <div v-if="testResult" class="rounded-[20px] border px-4 py-3 text-sm" :class="testResult.success ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'">
+          {{ testResult.message }}
+        </div>
+
+        <div v-if="testPhase === 'code' || testPhase === 'password'" class="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4">
+          <label class="space-y-2 text-sm text-slate-600">
+            <span class="font-medium text-slate-900">{{ testPhase === 'password' ? '两步验证密码' : 'Telegram 验证码' }}</span>
+            <input
+              v-model="testCode"
+              type="text"
+              :placeholder="testPhase === 'password' ? '请输入登录密码' : '请输入手机上收到的验证码'"
+              class="block w-full rounded-[18px] border-0 bg-white px-4 py-3 text-slate-900 ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-primary-600"
+              @keyup.enter="submitTestCode"
+            />
+          </label>
+          <div class="mt-3 flex justify-end gap-3">
+            <UiButton variant="outline" :loading="testSubmitting" @click="submitTestCode">提交</UiButton>
+          </div>
+        </div>
+
+      </div>
+      <template #footer>
+        <div class="flex flex-wrap justify-end gap-2">
+          <UiButton variant="outline" :loading="testStarting" @click="startFormTestRun">
+            测试配置
+          </UiButton>
+          <UiButton variant="outline" @click="drawerModel = false">取消</UiButton>
           <UiButton :loading="saving" @click="submitForm">保存账号</UiButton>
         </div>
-      </div>
+      </template>
     </UiDrawer>
 
     <UiDrawer v-model="detailOpen" title="账号详情">

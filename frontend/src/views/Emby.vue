@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from '@headlessui/vue'
-import { ArrowPathIcon, CheckCircleIcon, InformationCircleIcon, MagnifyingGlassIcon, PencilSquareIcon, PlusIcon, TrashIcon, TvIcon, XCircleIcon } from '@heroicons/vue/24/outline'
+import { ArrowPathIcon, CheckCircleIcon, ChevronDownIcon, InformationCircleIcon, MagnifyingGlassIcon, PencilSquareIcon, PlusIcon, TrashIcon, TvIcon, XCircleIcon } from '@heroicons/vue/24/outline'
 import UiCard from '@/components/ui/UiCard.vue'
 import UiBadge from '@/components/ui/UiBadge.vue'
 import UiButton from '@/components/ui/UiButton.vue'
@@ -14,6 +14,7 @@ import UiTooltip from '@/components/ui/UiTooltip.vue'
 import Switch from '@/components/Switch.vue'
 import { useSSE } from '@/composables/useSSE'
 import { useAuthStore } from '@/stores/auth'
+import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { formatScheduleConcurrency, formatScheduleInterval, formatScheduleTimeRange } from '@/utils/schedulerDisplay'
 import { logger } from '@/utils/logger'
 
@@ -59,7 +60,7 @@ type EmbyAccountItem = {
   cf_challenge: boolean
   allow_multiple: boolean
   play_id?: string | null
-  time: number[]
+  time: number | number[]
   interval_days?: string | null
   time_range?: string | null
   watch_history?: Array<{ status: 'success' | 'failed', time: string }>
@@ -103,6 +104,7 @@ const detailTab = ref<'history' | 'device' | 'test'>('history')
 const detailLoading = ref(false)
 const historyLoading = ref(false)
 const runDetailLoading = ref(false)
+let accountDetailRequestVersion = 0
 const detailError = ref('')
 const selectedRunId = ref('')
 const selectedRun = ref<EmbyRunItem | null>(null)
@@ -115,7 +117,11 @@ const testLogsEndpoint = ref<string | null>(null)
 const testError = ref('')
 const formMode = ref<'create' | 'edit'>('create')
 const formError = ref('')
+const formTestActive = ref(false)
+const formErrorElement = ref<HTMLElement | null>(null)
 const pageError = ref('')
+const probeStarting = ref(false)
+const probeResult = ref<{ success: boolean; message: string } | null>(null)
 const form = ref<EmbyForm>({
   url: '',
   username: '',
@@ -132,6 +138,8 @@ const form = ref<EmbyForm>({
   interval_days: '',
   time_range: '',
 })
+
+const { model: drawerModel } = useUnsavedChanges(drawerOpen, () => form.value, saving)
 
 const filteredAccounts = computed(() => {
   const keyword = search.value.trim().toLowerCase()
@@ -193,14 +201,10 @@ const accountDetailItems = computed(() => {
 
   return [
     { label: '用户名', value: currentAccount.value.username },
-    { label: '域名', value: currentAccount.value.hostname || '-' },
-    { label: '显示名称', value: currentAccount.value.name || '-' },
-    { label: '站点标题', value: currentAccount.value.site_title || currentAccount.value.hostname || '-' },
     { label: '播放时长', value: Array.isArray(currentAccount.value.time) ? `${currentAccount.value.time[0]} - ${currentAccount.value.time[1]} 秒` : '-' },
     { label: '单独间隔', value: formatScheduleInterval(currentAccount.value.interval_days) },
     { label: '单独时段', value: formatScheduleTimeRange(currentAccount.value.time_range) },
     { label: '指定播放 ID', value: currentAccount.value.play_id || '-' },
-    { label: '允许多开', value: currentAccount.value.allow_multiple ? '是' : '否' },
   ]
 })
 
@@ -315,7 +319,8 @@ const closeDeleteDialog = (force = false) => {
 }
 
 const applyForm = (account?: EmbyAccountItem | null) => {
-  const time = Array.isArray(account?.time) && account?.time.length >= 2 ? account.time : [300, 600]
+  const time = typeof account?.time === 'number' ? [account.time, account.time]
+    : Array.isArray(account?.time) && account.time.length >= 2 ? account.time : [300, 600]
   form.value = {
     url: account?.url || '',
     username: account?.username || '',
@@ -368,7 +373,8 @@ const saveEmbyModuleSetting = async (enabled: boolean) => {
 }
 
 const buildAccountUpdatePayload = (account: EmbyAccountItem, enabled = account.enabled) => {
-  const time = Array.isArray(account.time) && account.time.length >= 2 ? account.time : [300, 600]
+  const time = typeof account.time === 'number' ? [account.time, account.time]
+    : Array.isArray(account.time) && account.time.length >= 2 ? account.time : [300, 600]
 
   return {
     url: account.url,
@@ -392,6 +398,12 @@ const openCreateDrawer = () => {
   formError.value = ''
   currentAccount.value = null
   applyForm(null)
+  stopTestPolling()
+  disconnectTestLogsStream()
+  testLogsEndpoint.value = null
+  formTestActive.value = false
+  probeResult.value = null
+  resetTestState()
   drawerOpen.value = true
 }
 
@@ -400,6 +412,12 @@ const openEditDrawer = (account: EmbyAccountItem) => {
   formError.value = ''
   currentAccount.value = account
   applyForm(account)
+  stopTestPolling()
+  disconnectTestLogsStream()
+  testLogsEndpoint.value = null
+  formTestActive.value = false
+  probeResult.value = null
+  resetTestState()
   detailOpen.value = false
   drawerOpen.value = true
 }
@@ -460,14 +478,14 @@ const {
     })
   },
   onError: (streamError) => {
-    if (detailOpen.value && detailTab.value === 'test' && testRunId.value) {
+    if ((detailOpen.value && detailTab.value === 'test' || formTestActive.value) && testRunId.value) {
       logger.error('Failed to stream test logs', streamError)
     }
   },
 })
 
 const syncTestLogsStream = () => {
-  const nextEndpoint = detailOpen.value && detailTab.value === 'test' && testRunId.value
+  const nextEndpoint = (detailOpen.value && detailTab.value === 'test' || formTestActive.value) && testRunId.value
     ? `/runinfo/logs/stream?include_children=true&keyword=${encodeURIComponent(testRunId.value)}`
     : null
 
@@ -506,7 +524,9 @@ const fetchRunBundle = async (runId: string) => {
 const refreshCurrentAccount = async (preferredRunId?: string) => {
   if (!currentAccountKey.value) return
 
-  const encodedKey = encodeURIComponent(currentAccountKey.value)
+  const accountKeyAtRequest = currentAccountKey.value
+  const requestVersion = ++accountDetailRequestVersion
+  const encodedKey = encodeURIComponent(accountKeyAtRequest)
   historyLoading.value = true
   detailError.value = ''
 
@@ -516,6 +536,8 @@ const refreshCurrentAccount = async (preferredRunId?: string) => {
       auth.request(`/emby/accounts/runs?key=${encodedKey}&limit=20`),
       auth.request(`/emby/accounts/device?key=${encodedKey}`),
     ])
+
+    if (requestVersion !== accountDetailRequestVersion || currentAccountKey.value !== accountKeyAtRequest) return
 
     currentAccount.value = {
       ...accountData.account,
@@ -530,28 +552,41 @@ const refreshCurrentAccount = async (preferredRunId?: string) => {
       resetRunDetail()
     }
   } catch (error) {
+    if (requestVersion !== accountDetailRequestVersion || currentAccountKey.value !== accountKeyAtRequest) return
     logger.error('Failed to refresh emby account detail', error)
     detailError.value = logger.message(error, '账号详情刷新失败')
   } finally {
-    historyLoading.value = false
+    if (requestVersion === accountDetailRequestVersion) historyLoading.value = false
   }
 }
 
 const loadRunDetail = async (runId: string) => {
+  const accountKeyAtStart = currentAccountKey.value
   selectedRunId.value = runId
   runDetailLoading.value = true
   detailError.value = ''
 
   try {
     const data = await fetchRunBundle(runId)
+    if (!detailOpen.value || currentAccountKey.value !== accountKeyAtStart || selectedRunId.value !== runId) return
     selectedRun.value = data.run
     selectedRunLogs.value = data.logs
   } catch (error) {
+    if (!detailOpen.value || currentAccountKey.value !== accountKeyAtStart || selectedRunId.value !== runId) return
     logger.error('Failed to fetch run detail', error)
     detailError.value = logger.message(error, '运行记录详情加载失败')
   } finally {
     runDetailLoading.value = false
   }
+}
+
+const toggleRunDetail = async (runId: string) => {
+  if (selectedRunId.value === runId && !runDetailLoading.value) {
+    resetRunDetail()
+    return
+  }
+
+  await loadRunDetail(runId)
 }
 
 const refreshTestRun = async (silent = false) => {
@@ -587,6 +622,8 @@ const startTestPolling = () => {
 }
 
 const openDetailDrawer = async (account: EmbyAccountItem) => {
+  const requestVersion = ++accountDetailRequestVersion
+  const accountKeyAtRequest = accountKey(account)
   currentAccount.value = account
   detailTab.value = 'history'
   detailOpen.value = true
@@ -598,16 +635,18 @@ const openDetailDrawer = async (account: EmbyAccountItem) => {
   pageError.value = ''
 
   try {
-    const data = await auth.request(`/emby/accounts/detail?key=${encodeURIComponent(accountKey(account))}`)
+    const data = await auth.request(`/emby/accounts/detail?key=${encodeURIComponent(accountKeyAtRequest)}`)
+    if (requestVersion !== accountDetailRequestVersion || currentAccountKey.value !== accountKeyAtRequest) return
     currentAccount.value = data.account
     if (currentAccount.value?.run_history?.[0]?.id) {
       await loadRunDetail(currentAccount.value.run_history[0].id)
     }
   } catch (error) {
+    if (requestVersion !== accountDetailRequestVersion || currentAccountKey.value !== accountKeyAtRequest) return
     logger.error('Failed to fetch emby account detail', error)
     detailError.value = logger.message(error, '账号详情加载失败')
   } finally {
-    detailLoading.value = false
+    if (requestVersion === accountDetailRequestVersion) detailLoading.value = false
   }
 }
 
@@ -651,48 +690,12 @@ const startAccountTestRun = async () => {
 }
 
 const submitForm = async () => {
+  if (!validateForm()) return
+
   saving.value = true
   formError.value = ''
 
-  if (!form.value.url.trim()) {
-    formError.value = '请输入服务地址'
-    saving.value = false
-    return
-  }
-
-  if (!form.value.username.trim()) {
-    formError.value = '请输入用户名'
-    saving.value = false
-    return
-  }
-
-  if (formMode.value === 'create' && !form.value.password) {
-    formError.value = '创建账号时必须填写密码'
-    saving.value = false
-    return
-  }
-
-  if (form.value.time_start <= 0 || form.value.time_end <= 0 || form.value.time_end < form.value.time_start) {
-    formError.value = '播放时长范围无效'
-    saving.value = false
-    return
-  }
-
-  const payload = {
-    url: form.value.url,
-    username: form.value.username,
-    password: form.value.password,
-    name: form.value.name || null,
-    enabled: form.value.enabled,
-    use_proxy: form.value.use_proxy,
-    allow_stream: form.value.allow_stream,
-    cf_challenge: form.value.cf_challenge,
-    allow_multiple: form.value.allow_multiple,
-    play_id: form.value.play_id || null,
-    time: [form.value.time_start, form.value.time_end],
-    interval_days: form.value.interval_days || null,
-    time_range: form.value.time_range || null,
-  }
+  const payload = buildFormPayload()
 
   try {
     if (formMode.value === 'create') {
@@ -714,6 +717,147 @@ const submitForm = async () => {
     formError.value = logger.message(error, '保存账号失败')
   } finally {
     saving.value = false
+  }
+}
+
+const validateForm = () => {
+  const errors: string[] = []
+
+  if (!form.value.url.trim()) {
+    errors.push('请输入服务地址')
+  }
+
+  if (!form.value.username.trim()) {
+    errors.push('请输入用户名')
+  }
+
+  if (formMode.value === 'create' && !form.value.password) {
+    errors.push('创建账号时必须填写密码')
+  }
+
+  if (form.value.time_start <= 0 || form.value.time_end <= 0 || form.value.time_end < form.value.time_start) {
+    errors.push('播放时长范围无效')
+  }
+
+  if (errors.length) {
+    formError.value = errors[0]
+    scrollFormErrorIntoView()
+    return false
+  }
+
+  return true
+}
+
+const scrollFormErrorIntoView = async () => {
+  await nextTick()
+  formErrorElement.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+const buildFormPayload = () => {
+  return {
+    url: form.value.url,
+    username: form.value.username,
+    password: form.value.password,
+    name: form.value.name || null,
+    enabled: form.value.enabled,
+    use_proxy: form.value.use_proxy,
+    allow_stream: form.value.allow_stream,
+    cf_challenge: form.value.cf_challenge,
+    allow_multiple: form.value.allow_multiple,
+    play_id: form.value.play_id || null,
+    time: [form.value.time_start, form.value.time_end],
+    interval_days: form.value.interval_days || null,
+    time_range: form.value.time_range || null,
+  }
+}
+
+const startFormTestRun = async () => {
+  if (!validateForm()) return
+
+  formTestActive.value = true
+  testStarting.value = true
+  testError.value = ''
+  stopTestPolling()
+
+  try {
+    const key = formMode.value === 'edit' && currentAccountKey.value
+      ? `?key=${encodeURIComponent(currentAccountKey.value)}`
+      : ''
+    const data = await auth.request(`/emby/accounts/test-run${key}`, {
+      method: 'POST',
+      body: JSON.stringify(buildFormPayload()),
+    })
+    testRunId.value = data.run_id || ''
+
+    if (!testRunId.value) {
+      throw new Error('测试任务已提交，但暂时还没有可读取的运行记录')
+    }
+
+    const bundle = await fetchRunBundle(testRunId.value)
+    testRun.value = bundle.run
+    testRunLogs.value = bundle.logs
+    syncTestLogsStream()
+    await refreshTestRun()
+    if (isActiveRun(testRun.value?.status)) {
+      startTestPolling()
+    }
+  } catch (error) {
+    logger.error('Failed to start emby account config test run', error)
+    testError.value = logger.message(error, '启动测试失败')
+  } finally {
+    testStarting.value = false
+  }
+}
+
+const testPlayId = async () => {
+  const playId = form.value.play_id.trim()
+
+  if (!form.value.url.trim() || !form.value.username.trim()) {
+    probeResult.value = { success: false, message: '请先填写服务地址和用户名' }
+    return
+  }
+
+  if (!playId) {
+    probeResult.value = { success: false, message: '请先填写播放 ID' }
+    return
+  }
+
+  probeStarting.value = true
+  probeResult.value = null
+
+  try {
+    const query = formMode.value === 'edit' && currentAccountKey.value
+      ? `?key=${encodeURIComponent(currentAccountKey.value)}`
+      : ''
+    const data = await auth.request(`/emby/accounts/probe-item${query}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        url: form.value.url,
+        username: form.value.username,
+        password: form.value.password,
+        name: form.value.name || null,
+        use_proxy: form.value.use_proxy,
+        cf_challenge: form.value.cf_challenge,
+        play_id: playId,
+      }),
+    })
+
+    const item = data.item || {}
+    const parts: string[] = []
+
+    if (item.name) parts.push(String(item.name))
+    if (item.series && item.series !== item.name) parts.push(`来自《${item.series}》`)
+    if (item.duration_seconds) parts.push(`时长约 ${Math.max(1, Math.round(item.duration_seconds / 60))} 分钟`)
+
+    probeResult.value = {
+      success: true,
+      message: parts.length ? `播放 ID 可用：${parts.join(' · ')}` : '播放 ID 可用，已成功获取视频项目。',
+    }
+  } catch (error) {
+    logger.error('Failed to probe emby play id', error)
+    probeResult.value = { success: false, message: logger.message(error, '测试播放 ID 失败') }
+  } finally {
+    probeStarting.value = false
   }
 }
 
@@ -745,6 +889,7 @@ onMounted(() => {
 
 watch(detailOpen, (open) => {
   if (!open) {
+    accountDetailRequestVersion++
     stopTestPolling()
     disconnectTestLogsStream()
     testLogsEndpoint.value = null
@@ -758,12 +903,23 @@ watch(detailOpen, (open) => {
   }
 })
 
+watch(drawerOpen, (open) => {
+  if (!open) {
+    stopTestPolling()
+    disconnectTestLogsStream()
+    testLogsEndpoint.value = null
+    formTestActive.value = false
+    probeResult.value = null
+    resetTestState()
+  }
+})
+
 onBeforeUnmount(() => {
   stopTestPolling()
   disconnectTestLogsStream()
 })
 
-watch([detailOpen, detailTab, testRunId], () => {
+watch([detailOpen, detailTab, testRunId, formTestActive], () => {
   syncTestLogsStream()
 })
 </script>
@@ -771,7 +927,7 @@ watch([detailOpen, detailTab, testRunId], () => {
 <template>
   <div class="space-y-8">
     <section class="overflow-hidden rounded-[30px] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-teal-50 shadow-[0_24px_80px_-40px_rgba(5,150,105,0.32)]">
-      <div class="px-6 py-7 sm:px-8">
+      <div class="px-4 py-5 sm:px-6 sm:py-6 xl:px-8">
         <div class="space-y-5">
           <div class="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 ring-1 ring-emerald-200">
             <TvIcon class="h-4 w-4" aria-hidden="true" />
@@ -815,7 +971,7 @@ watch([detailOpen, detailTab, testRunId], () => {
             <h2 class="text-lg font-semibold tracking-tight text-slate-950">账号列表</h2>
             <p class="mt-1 text-sm text-slate-500">按账号查看保活相关选项。</p>
           </div>
-          <div class="flex items-center gap-3">
+          <div class="flex shrink-0 flex-wrap items-center gap-2">
             <div class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500 ring-1 ring-slate-200">
               共 {{ filteredAccounts.length }} / {{ accounts.length }} 个账号
             </div>
@@ -827,18 +983,18 @@ watch([detailOpen, detailTab, testRunId], () => {
         </div>
       </template>
 
-      <div class="rounded-[26px] border border-slate-200/70 bg-slate-50/80 p-5 sm:p-6">
+      <div class="min-w-0 rounded-[26px] border border-slate-200/70 bg-slate-50/80 p-3 sm:p-4">
 
-    <div class="mb-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_200px]">
-      <div class="relative">
+    <div class="mb-5 grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-[minmax(0,1fr)_180px_200px]">
+      <div class="relative col-span-2 min-w-0 lg:col-span-1">
         <label for="emby-search" class="sr-only">搜索账号</label>
         <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
           <MagnifyingGlassIcon class="h-5 w-5 text-gray-400" />
         </div>
         <input id="emby-search" v-model="search" type="text" placeholder="搜索用户名、域名、播放 ID" class="block w-full rounded-[18px] border-0 bg-white py-3 pl-10 pr-4 text-slate-900 ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-600" />
       </div>
-      <UiSelect v-model="statusFilter" :options="statusFilterOptions" class="w-full" />
-      <UiSelect v-model="featureFilter" :options="featureFilterOptions" class="w-full" />
+      <UiSelect v-model="statusFilter" :options="statusFilterOptions" aria-label="筛选账号状态" class="min-w-0 w-full" />
+      <UiSelect v-model="featureFilter" :options="featureFilterOptions" aria-label="筛选账号特性" class="min-w-0 w-full" />
     </div>
 
     <div v-if="pageError" class="mb-4 rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -859,10 +1015,10 @@ watch([detailOpen, detailTab, testRunId], () => {
       <p class="mt-2 text-sm text-slate-500">调整筛选条件或新增账号后再试。</p>
     </div>
 
-    <div v-else class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div v-else class="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
       <UiCard v-for="account in filteredAccounts" :key="accountKey(account)" hover padding="none">
         <div
-          class="h-full p-5 sm:p-7"
+          class="h-full min-w-0 p-4 sm:p-5"
           role="button"
           tabindex="0"
           @click="openDetailDrawer(account)"
@@ -930,9 +1086,9 @@ watch([detailOpen, detailTab, testRunId], () => {
       </div>
     </UiCard>
 
-    <UiDrawer v-model="drawerOpen" :title="drawerTitle">
+    <UiDrawer v-model="drawerModel" :title="drawerTitle">
       <div class="space-y-6">
-        <div v-if="formError" class="rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div v-if="formError" ref="formErrorElement" class="rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           {{ formError }}
         </div>
 
@@ -1063,55 +1219,101 @@ watch([detailOpen, detailTab, testRunId], () => {
               </div>
             </div>
             <div class="border-t border-slate-200 pt-5">
-              <UiScheduleIntervalOverride v-model="form.interval_days" variant="plain" label="单独间隔天数" helper-text="可让当前账号沿用全局间隔，或单独指定固定天数 / 区间天数。" />
+              <UiScheduleIntervalOverride v-model="form.interval_days" variant="plain" label="单独间隔天数" helper-text="可让当前账号沿用全局间隔，或单独指定固定天数 / 区间天数。" :global-value="summary.interval_days" />
             </div>
             <div class="border-t border-slate-200 pt-5">
-              <UiScheduleTimeOverride v-model="form.time_range" variant="plain" label="单独执行时段" helper-text="可让当前账号沿用全局时段，或单独指定每天固定时间 / 时间范围。" />
+              <UiScheduleTimeOverride v-model="form.time_range" variant="plain" label="单独执行时段" helper-text="可让当前账号沿用全局时段，或单独指定每天固定时间 / 时间范围。" :global-value="summary.time_range" />
             </div>
             <div class="border-t border-slate-200 pt-5">
-              <label class="space-y-2 text-sm text-slate-600">
-                <span class="font-medium text-slate-900">指定播放 ID</span>
+              <div class="space-y-2 text-sm text-slate-600">
+                <div class="flex items-center justify-between gap-3">
+                  <span class="font-medium text-slate-900">指定播放 ID</span>
+                  <UiButton size="sm" variant="secondary" :loading="probeStarting" @click="testPlayId">
+                    测试
+                  </UiButton>
+                </div>
                 <input v-model="form.play_id" type="text" placeholder="可选，指定固定视频 ID" class="block w-full rounded-[18px] border-0 bg-white px-4 py-3 text-slate-900 ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-primary-600" />
-              </label>
+                <p v-if="probeResult" class="text-xs leading-5" :class="probeResult.success ? 'text-emerald-600' : 'text-amber-600'">
+                  {{ probeResult.message }}
+                </p>
+                <p v-else class="text-xs leading-5 text-slate-400">填写后点「测试」，会立即登录并检查该视频 ID 是否存在且可播放。</p>
+              </div>
             </div>
           </div>
         </UiCard>
 
-        <div class="flex justify-end gap-3">
-          <UiButton variant="outline" @click="drawerOpen = false">取消</UiButton>
+        <div v-if="formTestActive" class="rounded-[20px] border border-slate-200 bg-slate-50/70 p-4">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <h4 class="text-sm font-semibold text-slate-900">连接测试</h4>
+              <ArrowPathIcon v-if="testLogsConnected" class="h-4 w-4 animate-spin text-emerald-500" />
+            </div>
+            <UiBadge v-if="testRun" :variant="runStatusVariant(testRun.status)">{{ testRun.status || 'UNKNOWN' }}</UiBadge>
+          </div>
+
+          <div v-if="testError" class="mt-3 rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {{ testError }}
+          </div>
+
+          <div v-if="testRun" class="mt-3">
+            <p class="break-all text-xs text-slate-500">任务 {{ testRun.id }}</p>
+            <p v-if="testRun.status_info" class="mt-1 text-sm text-slate-600">{{ testRun.status_info }}</p>
+          </div>
+
+          <div v-if="testRunTimeline.length" class="mt-3">
+            <UiTimeline :items="testRunTimeline" />
+          </div>
+
+          <div v-else-if="!testRun && !testError" class="mt-3 rounded-[16px] border border-dashed border-slate-200 bg-white/70 px-4 py-6 text-center text-sm text-slate-500">
+            点击下方「测试配置」按钮，会立即检查账号能否正常登录并访问站点，结果会实时显示在这里。
+          </div>
+        </div>
+
+      </div>
+      <template #footer>
+        <div class="flex flex-wrap justify-end gap-2">
+          <UiButton variant="outline" :loading="testStarting" @click="startFormTestRun">
+            测试配置
+          </UiButton>
+          <UiButton variant="outline" @click="drawerModel = false">取消</UiButton>
           <UiButton :loading="saving" @click="submitForm">保存账号</UiButton>
         </div>
-      </div>
+      </template>
     </UiDrawer>
 
     <UiDrawer v-model="detailOpen" title="账号详情">
-      <div v-if="currentAccount" class="space-y-6">
-        <UiCard>
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <h3 class="text-lg font-semibold text-slate-950">{{ displayHostname(currentAccount) }}</h3>
-              <p class="mt-1 text-sm text-slate-500">{{ currentAccount.card_subtitle || currentAccount.username }}</p>
-              <p class="mt-2 break-all text-sm text-slate-500">{{ currentAccount.url }}</p>
+      <div v-if="currentAccount" class="space-y-5">
+        <div class="rounded-[20px] border border-slate-200/80 bg-slate-50/70 p-4">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <h3 class="text-base font-semibold text-slate-950">{{ displayHostname(currentAccount) }}</h3>
+                <UiBadge :variant="currentAccount.enabled ? 'success' : 'default'">
+                  {{ currentAccount.enabled ? '启用' : '停用' }}
+                </UiBadge>
+                <span class="mx-0.5 h-3.5 w-px bg-slate-300/70"></span>
+                <span class="flex flex-wrap items-center gap-1">
+                  <UiBadge size="sm" :variant="currentAccount.use_proxy ? 'info' : 'default'">代理</UiBadge>
+                  <UiBadge size="sm" :variant="currentAccount.allow_stream ? 'warning' : 'default'">流播放</UiBadge>
+                  <UiBadge size="sm" :variant="currentAccount.cf_challenge ? 'success' : 'default'">CF 检测</UiBadge>
+                  <UiBadge size="sm" :variant="currentAccount.allow_multiple ? 'info' : 'default'">多开</UiBadge>
+                </span>
+              </div>
+              <p class="mt-1 break-all text-sm text-slate-500">{{ currentAccount.url }}</p>
             </div>
-            <UiBadge :variant="currentAccount.enabled ? 'success' : 'default'">
-              {{ currentAccount.enabled ? '启用' : '停用' }}
-            </UiBadge>
+            <UiButton size="sm" variant="secondary" class="shrink-0" @click="openEditDrawer(currentAccount)">
+              <PencilSquareIcon class="mr-1.5 h-4 w-4" />
+              编辑
+            </UiButton>
           </div>
 
-          <div class="mt-5 flex flex-wrap gap-2">
-            <UiBadge :variant="currentAccount.use_proxy ? 'info' : 'default'">代理</UiBadge>
-            <UiBadge :variant="currentAccount.allow_stream ? 'warning' : 'default'">流播放</UiBadge>
-            <UiBadge :variant="currentAccount.cf_challenge ? 'success' : 'default'">CF 检测</UiBadge>
-            <UiBadge :variant="currentAccount.allow_multiple ? 'info' : 'default'">多开</UiBadge>
-          </div>
-
-          <div class="mt-5 grid gap-3 sm:grid-cols-2">
-            <div v-for="item in accountDetailItems" :key="item.label" class="rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3">
-              <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{{ item.label }}</p>
-              <p class="mt-2 break-all text-sm font-medium text-slate-900">{{ item.value }}</p>
+          <div class="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5">
+            <div v-for="item in accountDetailItems" :key="item.label" class="flex items-baseline justify-between gap-2 rounded-[12px] border border-slate-200/80 bg-white px-3 py-1.5">
+              <p class="shrink-0 text-xs text-slate-400">{{ item.label }}</p>
+              <p class="truncate text-sm font-medium text-slate-900">{{ item.value }}</p>
             </div>
           </div>
-        </UiCard>
+        </div>
 
         <div class="rounded-[20px] border border-slate-200 bg-slate-50 p-1">
           <div class="grid grid-cols-3 gap-1">
@@ -1138,131 +1340,103 @@ watch([detailOpen, detailTab, testRunId], () => {
         </div>
 
         <template v-else>
-          <div v-if="detailTab === 'history'" class="space-y-6">
-            <UiCard>
+          <div v-if="detailTab === 'history'">
+            <UiCard padding="sm">
               <div class="flex items-center justify-between gap-3">
                 <div>
                   <h4 class="text-base font-semibold text-slate-950">运行记录</h4>
-                  <p class="mt-1 text-sm text-slate-500">查看该账号最近的保活执行和每次运行的详细日志。</p>
+                  <p class="mt-0.5 text-sm text-slate-500">查看该账号最近的保活执行和每次运行的详细日志。</p>
                 </div>
                 <UiButton size="sm" variant="secondary" :loading="historyLoading" @click="refreshCurrentAccount()">
                   刷新
                 </UiButton>
               </div>
 
-              <div v-if="historyLoading && !(currentAccount.run_history || []).length" class="mt-4 space-y-3">
-                <div v-for="index in 3" :key="index" class="h-20 animate-pulse rounded-[18px] bg-slate-100"></div>
+              <div v-if="historyLoading && !(currentAccount.run_history || []).length" class="mt-4 space-y-2.5">
+                <div v-for="index in 3" :key="index" class="h-16 animate-pulse rounded-[16px] bg-slate-100"></div>
               </div>
 
-              <div v-else-if="!(currentAccount.run_history || []).length" class="mt-4 rounded-[18px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+              <div v-else-if="!(currentAccount.run_history || []).length" class="mt-4 rounded-[16px] border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
                 还没有这个账号的运行记录。
               </div>
 
-              <div v-else class="mt-4 space-y-3">
-                <button
-                  v-for="run in currentAccount.run_history"
-                  :key="run.id"
-                  type="button"
-                  class="w-full rounded-[18px] border px-4 py-4 text-left transition"
-                  :class="selectedRunId === run.id ? 'border-emerald-300 bg-emerald-50/70' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'"
-                  @click="loadRunDetail(run.id)"
-                >
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                      <div class="flex flex-wrap items-center gap-2">
-                        <p class="text-sm font-semibold text-slate-900">{{ run.description || 'Emby 保活任务' }}</p>
-                        <UiBadge :variant="runStatusVariant(run.status)">{{ run.status || 'UNKNOWN' }}</UiBadge>
+              <div v-else class="mt-4 space-y-2.5">
+                <div v-for="run in currentAccount.run_history" :key="run.id">
+                  <button
+                    type="button"
+                    class="w-full rounded-[16px] border px-3.5 py-3 text-left transition"
+                    :class="selectedRunId === run.id ? 'border-emerald-300 bg-emerald-50/70' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'"
+                    @click="toggleRunDetail(run.id)"
+                  >
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <p class="text-sm font-semibold text-slate-900">{{ run.description || 'Emby 保活任务' }}</p>
+                          <UiBadge :variant="runStatusVariant(run.status)">{{ run.status || 'UNKNOWN' }}</UiBadge>
+                        </div>
+                        <p class="mt-1.5 text-xs text-slate-500">开始于 {{ formatDateTime(run.start_time) }}</p>
+                        <p v-if="run.status_info" class="mt-1 text-sm text-slate-600">{{ run.status_info }}</p>
                       </div>
-                      <p class="mt-2 text-xs text-slate-500">开始于 {{ formatDateTime(run.start_time) }}</p>
-                      <p v-if="run.status_info" class="mt-1 text-sm text-slate-600">{{ run.status_info }}</p>
+                      <div class="flex shrink-0 items-start gap-2 text-right text-xs text-slate-500">
+                        <div>
+                          <p>耗时 {{ formatRunDuration(run.duration) }}</p>
+                          <p class="mt-1">ID {{ run.id }}</p>
+                        </div>
+                        <ChevronDownIcon class="mt-0.5 h-4 w-4 text-slate-400 transition" :class="selectedRunId === run.id ? 'rotate-180' : ''" aria-hidden="true" />
+                      </div>
                     </div>
-                    <div class="text-right text-xs text-slate-500">
-                      <p>耗时 {{ formatRunDuration(run.duration) }}</p>
-                      <p class="mt-1">ID {{ run.id }}</p>
+                  </button>
+
+                  <div
+                    v-if="selectedRunId === run.id && (runDetailLoading || selectedRun)"
+                    class="mt-2 rounded-[16px] border border-slate-200 bg-slate-50/70 px-3.5 py-3.5"
+                  >
+                    <div v-if="runDetailLoading" class="rounded-[14px] border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500">
+                      正在加载运行详情
                     </div>
-                  </div>
-                </button>
-              </div>
-            </UiCard>
 
-            <UiCard>
-              <div class="flex items-center justify-between gap-3">
-                <div>
-                  <h4 class="text-base font-semibold text-slate-950">运行详情</h4>
-                  <p class="mt-1 text-sm text-slate-500">每条运行记录都可以在这里查看状态、时间和日志。</p>
-                </div>
-                <UiBadge v-if="selectedRun" :variant="runStatusVariant(selectedRun.status)">{{ selectedRun.status || 'UNKNOWN' }}</UiBadge>
-              </div>
-
-              <div v-if="runDetailLoading" class="mt-4 rounded-[18px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                正在加载运行详情
-              </div>
-
-              <div v-else-if="!selectedRun" class="mt-4 rounded-[18px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                请选择一条运行记录查看详情。
-              </div>
-
-              <template v-else>
-                <div class="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div class="rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3">
-                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">运行 ID</p>
-                    <p class="mt-2 text-sm font-medium text-slate-900">{{ selectedRun.id }}</p>
-                  </div>
-                  <div class="rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3">
-                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">状态说明</p>
-                    <p class="mt-2 text-sm font-medium text-slate-900">{{ selectedRun.status_info || '-' }}</p>
-                  </div>
-                  <div class="rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3">
-                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">开始时间</p>
-                    <p class="mt-2 text-sm font-medium text-slate-900">{{ formatDateTime(selectedRun.start_time) }}</p>
-                  </div>
-                  <div class="rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3">
-                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">结束时间</p>
-                    <p class="mt-2 text-sm font-medium text-slate-900">{{ formatDateTime(selectedRun.end_time) }}</p>
+                    <template v-else-if="selectedRun">
+                      <div v-if="selectedRunTimeline.length">
+                        <UiTimeline :items="selectedRunTimeline" />
+                      </div>
+                      <div v-else class="rounded-[14px] border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500">
+                        这条运行记录暂时没有日志。
+                      </div>
+                    </template>
                   </div>
                 </div>
-
-                <div class="mt-5">
-                  <h5 class="text-sm font-semibold text-slate-900">日志</h5>
-                  <div v-if="selectedRunTimeline.length" class="mt-3">
-                    <UiTimeline :items="selectedRunTimeline" />
-                  </div>
-                  <div v-else class="mt-3 rounded-[18px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                    这条运行记录暂时没有日志。
-                  </div>
-                </div>
-              </template>
+              </div>
             </UiCard>
           </div>
 
-          <div v-else-if="detailTab === 'device'" class="space-y-6">
-            <UiCard>
+          <div v-else-if="detailTab === 'device'">
+            <UiCard padding="sm">
               <div class="flex items-center justify-between gap-3">
                 <div>
                   <h4 class="text-base font-semibold text-slate-950">缓存的设备数据</h4>
-                  <p class="mt-1 text-sm text-slate-500">用于模拟客户端环境的设备信息，来源于最近一次成功初始化时缓存的值。</p>
+                  <p class="mt-0.5 text-sm text-slate-500">用于模拟客户端环境的设备信息，来源于最近一次成功初始化时缓存的值。</p>
                 </div>
                 <UiButton size="sm" variant="secondary" :loading="historyLoading" @click="refreshCurrentAccount()">
                   刷新
                 </UiButton>
               </div>
 
-              <div v-if="!deviceEntries.length" class="mt-4 rounded-[18px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+              <div v-if="!deviceEntries.length" class="mt-4 rounded-[16px] border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
                 还没有缓存到设备数据，先运行一次后通常会在这里看到。
               </div>
 
-              <div v-else class="mt-4 grid gap-3">
-                <div v-for="item in deviceEntries" :key="item.label" class="rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3">
-                  <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{{ item.label }}</p>
-                  <p class="mt-2 break-all text-sm font-medium text-slate-900">{{ item.value }}</p>
+              <div v-else class="mt-4 grid gap-2">
+                <div v-for="item in deviceEntries" :key="item.label" class="rounded-[14px] border border-slate-200/80 bg-slate-50 px-3 py-2.5">
+                  <p class="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">{{ item.label }}</p>
+                  <p class="mt-1 break-all text-sm font-medium text-slate-900">{{ item.value }}</p>
                 </div>
               </div>
             </UiCard>
           </div>
 
-          <div v-else class="space-y-6">
-            <UiCard>
-              <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div v-else>
+            <UiCard padding="sm">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex items-center gap-2">
                   <h4 class="text-base font-semibold text-slate-950">测试运行</h4>
                   <ArrowPathIcon v-if="testLogsConnected" class="h-4 w-4 animate-spin text-emerald-500" />
@@ -1272,47 +1446,40 @@ watch([detailOpen, detailTab, testRunId], () => {
                 </UiButton>
               </div>
 
-              <div v-if="testError" class="mt-4 rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <div v-if="testError" class="mt-4 rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                 {{ testError }}
               </div>
 
-              <div v-if="testRun" class="mt-4 grid gap-3 sm:grid-cols-2">
-                <div class="rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3">
-                  <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">当前测试任务</p>
-                  <p class="mt-2 text-sm font-medium text-slate-900">{{ testRun.id }}</p>
+              <div v-if="testRun" class="mt-4 grid grid-cols-2 gap-2">
+                <div class="rounded-[14px] border border-slate-200/80 bg-slate-50 px-3 py-2.5">
+                  <p class="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">当前测试任务</p>
+                  <p class="mt-1 break-all text-sm font-medium text-slate-900">{{ testRun.id }}</p>
                 </div>
-                <div class="rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3">
-                  <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">状态</p>
-                  <div class="mt-2 flex items-center gap-2">
+                <div class="rounded-[14px] border border-slate-200/80 bg-slate-50 px-3 py-2.5">
+                  <p class="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">状态</p>
+                  <div class="mt-1 flex items-center gap-2">
                     <UiBadge :variant="runStatusVariant(testRun.status)">{{ testRun.status || 'UNKNOWN' }}</UiBadge>
                     <span class="text-sm text-slate-600">{{ testRun.status_info || '执行中' }}</span>
                   </div>
                 </div>
               </div>
 
-              <div v-else class="mt-4 rounded-[18px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+              <div v-else class="mt-4 rounded-[16px] border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
                 点击上方按钮后，会在这里显示本次测试任务和日志。
               </div>
 
-              <div v-if="testRun || testRunTimeline.length" class="mt-5">
+              <div v-if="testRun || testRunTimeline.length" class="mt-4">
                 <div v-if="testRunTimeline.length">
                   <UiTimeline :items="testRunTimeline" />
                 </div>
 
-                <div v-else class="rounded-[18px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                <div v-else class="rounded-[16px] border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
                   还没有测试日志。
                 </div>
               </div>
             </UiCard>
           </div>
         </template>
-
-        <div class="flex justify-end gap-3">
-          <UiButton variant="secondary" @click="openEditDrawer(currentAccount)">
-            <PencilSquareIcon class="mr-2 h-4 w-4" />
-            编辑
-          </UiButton>
-        </div>
       </div>
     </UiDrawer>
 

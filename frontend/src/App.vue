@@ -7,11 +7,11 @@ import {
   Bars3Icon,
   XMarkIcon,
   HomeIcon,
-  DocumentTextIcon,
   ChatBubbleLeftRightIcon,
   TvIcon,
   MusicalNoteIcon,
   ChartBarIcon,
+  PuzzlePieceIcon,
   Cog6ToothIcon,
   ArrowRightOnRectangleIcon
 } from '@heroicons/vue/24/outline'
@@ -23,11 +23,11 @@ const sidebarOpen = ref(false)
 
 const navigation = [
   { name: '概览', href: '/status', icon: HomeIcon },
-  { name: '系统日志', href: '/logs', icon: DocumentTextIcon },
   { name: 'Telegram 账号', href: '/telegram', icon: ChatBubbleLeftRightIcon },
   { name: 'Emby 账号', href: '/emby', icon: TvIcon },
   { name: 'Subsonic 账号', href: '/subsonic', icon: MusicalNoteIcon },
   { name: '任务记录', href: '/runinfo', icon: ChartBarIcon },
+  { name: '自定义站点', href: '/sites', icon: PuzzlePieceIcon },
   { name: '系统设置', href: '/settings', icon: Cog6ToothIcon },
 ]
 
@@ -46,7 +46,7 @@ const logout = async () => {
 
   <div v-else class="h-full bg-slate-100">
     <TransitionRoot as="template" :show="sidebarOpen">
-      <Dialog as="div" class="relative z-50 lg:hidden" @close="sidebarOpen = false">
+      <Dialog as="div" class="relative z-50 xl:hidden" @close="sidebarOpen = false">
         <TransitionChild as="template" enter="transition-opacity ease-linear duration-300" enter-from="opacity-0" enter-to="opacity-100" leave="transition-opacity ease-linear duration-300" leave-from="opacity-100" leave-to="opacity-0">
           <div class="fixed inset-0 bg-gray-900/80" />
         </TransitionChild>
@@ -96,7 +96,7 @@ const logout = async () => {
     </TransitionRoot>
 
     <!-- Static sidebar for desktop -->
-    <div class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col border-r border-slate-200/80 bg-white/90 backdrop-blur-sm">
+    <div class="hidden xl:fixed xl:inset-y-0 xl:z-50 xl:flex xl:w-72 xl:flex-col border-r border-slate-200/80 bg-white/90 backdrop-blur-sm">
       <div class="flex grow flex-col gap-y-5 overflow-y-auto bg-transparent px-6 pb-4">
         <div class="flex h-16 shrink-0 items-center gap-3 pt-6 pb-2">
           <img class="h-10 w-auto" src="/assets/img/illustrations/logo-only.svg" alt="EmbyKeeper" />
@@ -126,18 +126,18 @@ const logout = async () => {
     </div>
 
     <!-- Main content area -->
-    <div class="lg:pl-72 flex flex-col h-screen">
+    <div class="flex h-dvh min-w-0 flex-col xl:pl-72">
       <!-- Mobile header -->
-      <div class="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur-sm sm:gap-x-6 sm:px-6 lg:hidden">
-        <button type="button" class="-m-2.5 p-2.5 text-gray-700 lg:hidden" @click="sidebarOpen = true">
-          <span class="sr-only">Open sidebar</span>
+      <div class="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-x-4 border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur-sm sm:h-16 sm:gap-x-6 sm:px-6 xl:hidden">
+        <button type="button" class="-m-2.5 p-2.5 text-gray-700 xl:hidden" @click="sidebarOpen = true">
+          <span class="sr-only">打开导航菜单</span>
           <Bars3Icon class="h-6 w-6" aria-hidden="true" />
         </button>
         <div class="flex-1 text-sm font-semibold leading-6 text-gray-900">EmbyKeeper</div>
       </div>
 
-      <main class="flex-1 overflow-y-auto">
-        <div class="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
+      <main class="min-h-0 min-w-0 flex-1 overflow-y-auto">
+        <div class="mx-auto w-full min-w-0 max-w-7xl p-3 sm:p-5 xl:p-8">
           <router-view />
         </div>
       </main>

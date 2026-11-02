@@ -1,14 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { AUTH_CACHE_TTL_MS } from '@/utils/constants'
-import { logger } from '@/utils/logger'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem('ek_token') || '')
   const showLogin = ref(true)
 
-  const headers = computed(() => {
-    return token.value ? { Authorization: `Bearer ${token.value}` } : {}
+  const headers = computed<Record<string, string>>(() => {
+    const result: Record<string, string> = {}
+    if (token.value) result.Authorization = `Bearer ${token.value}`
+    return result
   })
 
   const isLoggedIn = computed(() => !!token.value && !showLogin.value)
@@ -27,7 +27,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
 
       return !showLogin.value
-    } catch (error) {
+    } catch {
       showLogin.value = true
       return false
     }

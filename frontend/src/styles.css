@@ -58,3 +58,22 @@
     transform: scale(1.35);
   }
 }
+
+@media (max-width: 639px) {
+  #app input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  #app textarea,
+  #app select {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

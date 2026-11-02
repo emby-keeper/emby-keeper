@@ -16,6 +16,7 @@
       ]"
       role="switch"
       :aria-checked="modelValue"
+      :aria-label="ariaLabel"
       @click.stop.prevent="toggle"
       @keydown.enter.prevent="toggle"
       @keydown.space.prevent="toggle"
@@ -43,6 +44,7 @@ const props = withDefaults(defineProps<{
   disabled?: boolean
   size?: SwitchSize
   label?: string
+  ariaLabel?: string
 }>(), {
   disabled: false,
   size: 'md',

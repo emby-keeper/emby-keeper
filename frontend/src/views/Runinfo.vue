@@ -5,6 +5,7 @@ import UiButton from '@/components/ui/UiButton.vue'
 import UiBadge from '@/components/ui/UiBadge.vue'
 import UiCard from '@/components/ui/UiCard.vue'
 import UiDrawer from '@/components/ui/UiDrawer.vue'
+import UiSelect from '@/components/ui/UiSelect.vue'
 import UiStat from '@/components/ui/UiStat.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRoute, useRouter } from 'vue-router'
@@ -30,8 +31,22 @@ const actionLoading = ref<string | null>(null)
 const error = ref('')
 const detailError = ref('')
 const initialDrawerSection = ref<'overview' | 'children'>('overview')
+let detailRequestVersion = 0
+let childRequestVersion = 0
 
 const ACTIVE_STATUSES = new Set(['PENDING', 'INITIALIZING', 'RUNNING'])
+const statusOptions = [
+  { label: '全部状态', value: '' },
+  { label: '等待执行', value: 'PENDING' },
+  { label: '初始化中', value: 'INITIALIZING' },
+  { label: '运行中', value: 'RUNNING' },
+  { label: '成功', value: 'SUCCESS' },
+  { label: '失败', value: 'FAIL' },
+  { label: '异常', value: 'ERROR' },
+  { label: '已取消', value: 'CANCELLED' },
+  { label: '已跳过', value: 'SKIP' },
+  { label: '等待重试', value: 'RESCHEDULE' },
+]
 
 const currentRun = computed(() => selectedChild.value?.run || detail.value?.run || null)
 const currentLogs = computed(() => selectedChild.value ? childLogs.value : logs.value)
@@ -109,8 +124,11 @@ const normalizeLogs = (items: RunLogEntry[]): RunLogEntry[] => {
 }
 
 const openDetail = async (id: string, section: 'overview' | 'children' = 'overview') => {
+  const requestVersion = ++detailRequestVersion
+  childRequestVersion++
   drawerOpen.value = true
   detailLoading.value = true
+  childDetailLoading.value = false
   detailError.value = ''
   initialDrawerSection.value = section
   detail.value = null
@@ -126,14 +144,16 @@ const openDetail = async (id: string, section: 'overview' | 'children' = 'overvi
       auth.request<{ logs: RunLogEntry[] }>(`/runinfo/${id}/logs?include_children=true`),
     ])
 
+    if (requestVersion !== detailRequestVersion) return
     detail.value = d
     children.value = c.runs || []
     logs.value = normalizeLogs(l.logs || [])
   } catch (err) {
+    if (requestVersion !== detailRequestVersion) return
     logger.error('Failed to fetch run detail', err)
     detailError.value = logger.message(err, '运行详情加载失败')
   } finally {
-    detailLoading.value = false
+    if (requestVersion === detailRequestVersion) detailLoading.value = false
   }
 }
 
@@ -149,6 +169,7 @@ const syncQuery = () => {
 }
 
 const openChildDetail = async (childId: string) => {
+  const requestVersion = ++childRequestVersion
   childDetailLoading.value = true
   detailError.value = ''
 
@@ -158,22 +179,27 @@ const openChildDetail = async (childId: string) => {
       auth.request<{ logs: RunLogEntry[] }>(`/runinfo/${childId}/logs?include_children=true`),
     ])
 
+    if (requestVersion !== childRequestVersion) return
     selectedChild.value = childDetail
     childLogs.value = normalizeLogs(childLogResult.logs || [])
   } catch (err) {
+    if (requestVersion !== childRequestVersion) return
     logger.error('Failed to fetch child run detail', err)
     detailError.value = logger.message(err, '子任务详情加载失败')
   } finally {
-    childDetailLoading.value = false
+    if (requestVersion === childRequestVersion) childDetailLoading.value = false
   }
 }
 
 const backToParent = () => {
+  childRequestVersion++
+  childDetailLoading.value = false
   selectedChild.value = null
   childLogs.value = []
 }
 
 const cancelRun = async (id: string) => {
+  if (!window.confirm('确定取消这个正在执行的任务吗？')) return
   actionLoading.value = id
 
   try {
@@ -192,6 +218,7 @@ const cancelRun = async (id: string) => {
 }
 
 const cancelAll = async () => {
+  if (!window.confirm('确定取消全部正在执行的任务吗？')) return
   actionLoading.value = 'all'
 
   try {
@@ -238,6 +265,10 @@ watch([status, search], () => {
 
 watch(drawerOpen, (open) => {
   if (!open) {
+    detailRequestVersion++
+    childRequestVersion++
+    detailLoading.value = false
+    childDetailLoading.value = false
     detail.value = null
     selectedChild.value = null
     children.value = []
@@ -269,7 +300,7 @@ onMounted(async () => {
 <template>
   <div class="space-y-8">
     <section class="overflow-hidden rounded-[30px] border border-slate-200/80 bg-gradient-to-br from-white via-slate-50 to-slate-100 shadow-[0_20px_60px_-32px_rgba(15,23,42,0.35)]">
-      <div class="flex flex-col gap-8 px-6 py-7 sm:px-8 md:flex-row md:items-end md:justify-between">
+  <div class="px-4 py-5 sm:px-6 sm:py-6 xl:px-8">
         <div class="max-w-2xl space-y-2">
           <p class="text-xs font-semibold uppercase tracking-[0.22em] text-primary-600">Task History</p>
           <div>
@@ -277,7 +308,7 @@ onMounted(async () => {
             <p class="mt-2 text-sm leading-6 text-slate-600">查看任务执行状态、运行结果与调度信息。</p>
           </div>
         </div>
-        <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <div class="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <UiStat label="运行记录" :value="summary.total" :icon="ChartBarIcon" />
           <UiStat label="运行中" :value="summary.running" :icon="PlayIcon" />
           <UiStat label="成功" :value="summary.success" :icon="CheckCircleIcon" />
@@ -299,9 +330,9 @@ onMounted(async () => {
         </div>
       </template>
 
-      <div class="rounded-[26px] border border-slate-200/70 bg-slate-50/80 p-5 sm:p-6">
-      <div class="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div class="flex flex-col sm:flex-row sm:items-center gap-3 flex-1 max-w-full">
+      <div class="min-w-0 rounded-[26px] border border-slate-200/70 bg-slate-50/80 p-3 sm:p-4">
+      <div class="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div class="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-end">
           <div class="relative w-full sm:max-w-xs">
             <label for="runinfo-search" class="sr-only">搜索运行记录</label>
             <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -316,17 +347,15 @@ onMounted(async () => {
             />
           </div>
           <div class="relative w-full sm:max-w-xs">
-            <label for="runinfo-status" class="sr-only">按状态筛选</label>
-            <input
-              id="runinfo-status"
+            <UiSelect
               v-model="status"
-              type="text"
-              placeholder="指定状态, 例如 RUNNING"
-              class="block w-full rounded-[20px] border-0 bg-white px-4 py-3 text-slate-900 shadow-sm ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6"
+              label="按状态筛选"
+              :options="statusOptions"
+              @update:model-value="fetchList"
             />
           </div>
         </div>
-        <div class="flex items-center gap-3 shrink-0">
+        <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
           <UiButton @click="fetchList" :disabled="loading" variant="secondary">
             {{ loading ? '加载中...' : '刷新' }}
           </UiButton>
@@ -355,7 +384,40 @@ onMounted(async () => {
       </div>
 
       <div v-else class="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_10px_24px_-18px_rgba(15,23,42,0.28)]">
-        <div class="overflow-x-auto">
+        <div class="divide-y divide-slate-200 lg:hidden">
+          <article v-for="run in filteredRuns" :key="run.id" class="min-w-0 space-y-3 p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <span class="break-all font-mono text-xs font-semibold text-slate-600">{{ run.id }}</span>
+              <UiBadge :variant="getStatusVariant(run.status)">
+                {{ statusOptions.find(option => option.value === run.status)?.label || run.status }}
+              </UiBadge>
+            </div>
+            <p class="break-words text-sm font-medium leading-6 text-slate-900">{{ run.description || '-' }}</p>
+            <p v-if="run.status_info" class="break-words text-xs leading-5 text-slate-500">{{ run.status_info }}</p>
+            <dl class="grid grid-cols-2 gap-3 text-xs">
+              <div class="min-w-0">
+                <dt class="text-slate-400">开始时间</dt>
+                <dd class="mt-1 break-words text-slate-700">{{ formatDateTime(run.start_time) }}</dd>
+              </div>
+              <div class="min-w-0">
+                <dt class="text-slate-400">耗时</dt>
+                <dd class="mt-1 text-slate-700">{{ formatDuration(run.duration) }}</dd>
+              </div>
+              <div v-if="run.next_time" class="col-span-2 min-w-0">
+                <dt class="text-slate-400">下次执行</dt>
+                <dd class="mt-1 break-words text-slate-700">{{ formatDateTime(run.next_time) }}</dd>
+              </div>
+            </dl>
+            <div class="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3">
+              <UiButton size="sm" variant="secondary" @click="openDetail(run.id)">查看详情</UiButton>
+              <UiButton v-if="(run.child_count ?? 0) > 0" size="sm" variant="ghost" @click="openDetail(run.id, 'children')">
+                子任务 {{ run.child_count }}
+              </UiButton>
+              <UiButton v-if="canCancel(run)" size="sm" variant="danger" :loading="actionLoading === run.id" @click="cancelRun(run.id)">取消</UiButton>
+            </div>
+          </article>
+        </div>
+        <div class="hidden overflow-x-auto lg:block" tabindex="0" role="region" aria-label="任务记录表格">
         <table class="min-w-[1120px] table-auto divide-y divide-slate-200" role="grid" aria-label="任务列表">
           <thead class="bg-slate-50/90">
             <tr>
@@ -398,14 +460,14 @@ onMounted(async () => {
                 <button
                   type="button"
                   class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-200"
-                  @click="openDetail(run.id, 'children')"
+                  @click.stop="openDetail(run.id, 'children')"
                 >
                   {{ run.child_count ?? 0 }} 个
                 </button>
               </td>
               <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                 <div class="flex items-center justify-end gap-2">
-                  <UiButton size="sm" variant="ghost" @click="openDetail(run.id)">
+                  <UiButton size="sm" variant="ghost" @click.stop="openDetail(run.id)">
                     查看详情
                   </UiButton>
                   <UiButton
@@ -537,7 +599,16 @@ onMounted(async () => {
           </div>
 
           <div v-else class="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_10px_24px_-18px_rgba(15,23,42,0.28)]">
-            <div class="overflow-x-auto max-h-[50vh] overflow-y-auto">
+            <div class="max-h-[50dvh] divide-y divide-slate-100 overflow-y-auto overscroll-contain sm:hidden">
+              <article v-for="(log, index) in currentLogs" :key="index" class="min-w-0 space-y-2 p-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <time class="text-[11px] tabular-nums text-slate-500">{{ log.displayTime }}</time>
+                  <UiBadge size="sm" :variant="log.level === 'ERROR' ? 'error' : log.level === 'WARNING' ? 'warning' : 'default'">{{ log.level }}</UiBadge>
+                </div>
+                <p class="whitespace-pre-wrap break-all font-mono text-xs leading-6 text-slate-800">{{ log.message }}</p>
+              </article>
+            </div>
+            <div class="hidden max-h-[50dvh] overflow-auto sm:block" tabindex="0" role="region" aria-label="日志记录表格">
               <table class="min-w-full divide-y divide-slate-200" role="grid" aria-label="日志记录">
                 <thead class="bg-slate-50/90 sticky top-0 z-10">
                   <tr>
@@ -558,7 +629,7 @@ onMounted(async () => {
                     <td class="whitespace-nowrap px-3 py-4 text-sm text-slate-600">
                       <UiBadge :variant="log.level === 'ERROR' ? 'error' : log.level === 'WARNING' ? 'warning' : 'default'">{{ log.level }}</UiBadge>
                     </td>
-                    <td class="px-3 py-4 text-sm leading-6 text-slate-900">{{ log.message }}</td>
+                    <td class="break-words px-3 py-4 text-sm leading-6 text-slate-900">{{ log.message }}</td>
                   </tr>
                 </tbody>
               </table>

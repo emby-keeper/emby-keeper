@@ -8,6 +8,7 @@
 export const SSE_BASE_RETRY_DELAY_MS = 3_000
 export const SSE_MAX_RETRY_DELAY_MS = 60_000
 export const SSE_RECONNECT_SHORT_MS = 2_000
+export const SSE_CONNECT_TIMEOUT_MS = 10_000
 
 // --- Logs ---
 export const LOG_PAGE_LIMIT = 200

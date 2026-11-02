@@ -1,6 +1,6 @@
 import { ref, onUnmounted, type Ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { SSE_BASE_RETRY_DELAY_MS, SSE_MAX_RETRY_DELAY_MS } from '@/utils/constants'
+import { SSE_BASE_RETRY_DELAY_MS, SSE_MAX_RETRY_DELAY_MS, SSE_CONNECT_TIMEOUT_MS } from '@/utils/constants'
 import { logger } from '@/utils/logger'
 
 export interface SSEEvent<T = unknown> {
@@ -24,6 +24,7 @@ export function useSSE<T = unknown>(endpoint: Ref<string | null>, options: UseSS
   const error = ref<Error | null>(null)
 
   let abortController: AbortController | null = null
+  let connectionGeneration = 0
   let currentRetryDelay = SSE_BASE_RETRY_DELAY_MS
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let shouldReconnect = true
@@ -70,8 +71,14 @@ export function useSSE<T = unknown>(endpoint: Ref<string | null>, options: UseSS
     disconnect({ keepRetryState: true })
     shouldReconnect = true
     clearReconnectTimer()
-
-    abortController = new AbortController()
+    const generation = ++connectionGeneration
+    const controller = new AbortController()
+    abortController = controller
+    let connectTimedOut = false
+    const connectTimer = setTimeout(() => {
+      connectTimedOut = true
+      controller.abort()
+    }, SSE_CONNECT_TIMEOUT_MS)
 
     try {
       const url = endpoint.value.startsWith('http')
@@ -89,8 +96,14 @@ export function useSSE<T = unknown>(endpoint: Ref<string | null>, options: UseSS
       const response = await fetch(url, {
         credentials: 'include',
         headers,
-        signal: abortController.signal,
+        signal: controller.signal,
       })
+
+      clearTimeout(connectTimer)
+      if (generation !== connectionGeneration) {
+        await response.body?.cancel()
+        return
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`)
@@ -113,6 +126,11 @@ export function useSSE<T = unknown>(endpoint: Ref<string | null>, options: UseSS
 
       while (true) {
         const { done, value } = await reader.read()
+
+        if (generation !== connectionGeneration) {
+          await reader.cancel().catch(() => undefined)
+          return
+        }
 
         if (done) {
           break
@@ -143,6 +161,7 @@ export function useSSE<T = unknown>(endpoint: Ref<string | null>, options: UseSS
         }
       }
 
+      if (generation !== connectionGeneration) return
       isConnected.value = false
       options.onDisconnect?.()
 
@@ -151,7 +170,8 @@ export function useSSE<T = unknown>(endpoint: Ref<string | null>, options: UseSS
       }
 
     } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') {
+      if (generation !== connectionGeneration) return
+      if (err instanceof Error && err.name === 'AbortError' && !connectTimedOut) {
         return
       }
 
@@ -164,11 +184,13 @@ export function useSSE<T = unknown>(endpoint: Ref<string | null>, options: UseSS
 
       scheduleReconnect()
     } finally {
-      abortController = null
+      clearTimeout(connectTimer)
+      if (abortController === controller) abortController = null
     }
   }
 
   const disconnect = (opts?: { keepRetryState?: boolean }) => {
+    connectionGeneration++
     if (abortController) {
       abortController.abort()
       abortController = null

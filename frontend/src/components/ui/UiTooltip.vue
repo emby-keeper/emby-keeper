@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, useSlots } from 'vue'
+import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref, useSlots } from 'vue'
 
 const props = withDefaults(defineProps<{
   text?: string
@@ -12,49 +12,89 @@ const props = withDefaults(defineProps<{
 
 const slots = useSlots()
 const hasContentSlot = computed(() => Boolean(slots.content))
+const triggerRef = ref<HTMLElement | null>(null)
 const tooltipRef = ref<HTMLElement | null>(null)
 const isOpen = ref(false)
-const tooltipShift = ref(0)
-const arrowShift = ref(0)
+const isPinned = ref(false)
+const tooltipId = `ui-tooltip-${getCurrentInstance()?.uid}`
+const tooltipStyle = ref({ left: '12px', top: '12px', visibility: 'hidden' as 'hidden' | 'visible' })
+let closeTimer: ReturnType<typeof setTimeout> | null = null
 
 const VIEWPORT_MARGIN = 12
-const ARROW_MARGIN = 18
 
 const updatePosition = () => {
   const tooltipEl = tooltipRef.value
-  if (!tooltipEl) return
+  const triggerEl = triggerRef.value
+  if (!tooltipEl || !triggerEl) return
 
-  const rect = tooltipEl.getBoundingClientRect()
-  const maxRight = window.innerWidth - VIEWPORT_MARGIN
-  let shift = 0
+  const trigger = triggerEl.getBoundingClientRect()
+  const tooltip = tooltipEl.getBoundingClientRect()
+  const left = Math.max(VIEWPORT_MARGIN, Math.min(
+    trigger.left + trigger.width / 2 - tooltip.width / 2,
+    window.innerWidth - tooltip.width - VIEWPORT_MARGIN,
+  ))
+  const above = trigger.top - tooltip.height - 10
+  const below = trigger.bottom + 10
+  let top = props.position === 'top' ? above : below
+  if (top < VIEWPORT_MARGIN) top = below
+  if (top + tooltip.height > window.innerHeight - VIEWPORT_MARGIN) top = above
+  top = Math.max(VIEWPORT_MARGIN, Math.min(top, window.innerHeight - tooltip.height - VIEWPORT_MARGIN))
+  tooltipStyle.value = { left: `${left}px`, top: `${top}px`, visibility: 'visible' }
+}
 
-  if (rect.left < VIEWPORT_MARGIN) {
-    shift = VIEWPORT_MARGIN - rect.left
-  } else if (rect.right > maxRight) {
-    shift = maxRight - rect.right
-  }
-
-  tooltipShift.value = shift
-
-  const maxArrowShift = Math.max(rect.width / 2 - ARROW_MARGIN, 0)
-  arrowShift.value = Math.min(Math.max(-shift, -maxArrowShift), maxArrowShift)
+const cancelClose = () => {
+  if (closeTimer !== null) clearTimeout(closeTimer)
+  closeTimer = null
 }
 
 const openTooltip = async () => {
-  if (isOpen.value) return
-
+  cancelClose()
   isOpen.value = true
-  tooltipShift.value = 0
-  arrowShift.value = 0
-
   await nextTick()
+  const control = triggerRef.value?.querySelector<HTMLElement>('button, a, input, [tabindex]')
+  if (control) {
+    const descriptions = new Set((control.getAttribute('aria-describedby') || '').split(' ').filter(Boolean))
+    descriptions.add(tooltipId)
+    control.setAttribute('aria-describedby', [...descriptions].join(' '))
+  }
   updatePosition()
 }
 
 const closeTooltip = () => {
+  cancelClose()
   isOpen.value = false
-  tooltipShift.value = 0
-  arrowShift.value = 0
+  isPinned.value = false
+  const control = triggerRef.value?.querySelector<HTMLElement>('button, a, input, [tabindex]')
+  if (control) {
+    const descriptions = (control.getAttribute('aria-describedby') || '').split(' ').filter(value => value && value !== tooltipId)
+    if (descriptions.length) control.setAttribute('aria-describedby', descriptions.join(' '))
+    else control.removeAttribute('aria-describedby')
+  }
+}
+
+const scheduleClose = () => {
+  cancelClose()
+  if (!isPinned.value) closeTimer = setTimeout(closeTooltip, 150)
+}
+
+const togglePinned = () => {
+  if (isPinned.value) closeTooltip()
+  else {
+    isPinned.value = true
+    void openTooltip()
+  }
+}
+
+const closeOutside = (event: PointerEvent) => {
+  const target = event.target as Node | null
+  if (!triggerRef.value?.contains(target) && !tooltipRef.value?.contains(target)) closeTooltip()
+}
+
+const onEscape = (event: KeyboardEvent) => {
+  if (isOpen.value && event.key === 'Escape') {
+    event.stopPropagation()
+    closeTooltip()
+  }
 }
 
 const syncTooltipPosition = () => {
@@ -66,39 +106,48 @@ const syncTooltipPosition = () => {
 onMounted(() => {
   window.addEventListener('resize', syncTooltipPosition)
   window.addEventListener('scroll', syncTooltipPosition, true)
+  document.addEventListener('pointerdown', closeOutside)
+  window.addEventListener('keydown', onEscape, true)
 })
 
 onBeforeUnmount(() => {
+  closeTooltip()
   window.removeEventListener('resize', syncTooltipPosition)
   window.removeEventListener('scroll', syncTooltipPosition, true)
+  document.removeEventListener('pointerdown', closeOutside)
+  window.removeEventListener('keydown', onEscape, true)
 })
 </script>
 
 <template>
-  <div class="relative inline-flex items-center" @mouseenter="openTooltip" @mouseleave="closeTooltip" @focusin="openTooltip" @focusout="closeTooltip">
+  <span
+    ref="triggerRef"
+    class="inline-flex shrink-0 items-center"
+    @pointerenter="openTooltip"
+    @pointerleave="scheduleClose"
+    @focusin="openTooltip"
+    @focusout="scheduleClose"
+    @click="togglePinned"
+  >
     <slot />
-    <div
-      ref="tooltipRef"
-      :class="[
-        'pointer-events-none absolute left-1/2 z-30 max-w-[calc(100vw-1.5rem)] rounded-[20px] border border-slate-200/90 bg-white/95 px-4 py-3 text-xs leading-5 text-slate-600 shadow-[0_24px_60px_-30px_rgba(15,23,42,0.35)] ring-1 ring-white/70 backdrop-blur-sm transition duration-200',
-        props.widthClass,
-        props.position === 'top' ? 'bottom-full mb-3' : 'top-full mt-3',
-        isOpen ? 'opacity-100' : 'opacity-0',
-      ]"
-      :style="{ transform: `translateX(calc(-50% + ${tooltipShift}px))` }"
-      role="tooltip"
-    >
-      <slot name="content">
-        <span v-if="!hasContentSlot">{{ text }}</span>
-      </slot>
-      <span
+    <Teleport to="body">
+      <div
+        v-if="isOpen"
+        :id="tooltipId"
+        ref="tooltipRef"
         :class="[
-          'absolute h-3 w-3 -translate-x-1/2 rotate-45 border border-slate-200/90 bg-white/95',
-          props.position === 'top' ? '-bottom-1.5' : '-top-1.5',
+          'fixed z-[100] max-h-[calc(100dvh-1.5rem)] max-w-[calc(100vw-1.5rem)] overflow-y-auto overscroll-contain break-words rounded-lg border border-slate-200 bg-white px-4 py-3 text-xs leading-5 text-slate-700 shadow-lg',
+          props.widthClass,
         ]"
-        :style="{ left: `calc(50% + ${arrowShift}px)` }"
-        aria-hidden="true"
-      />
-    </div>
-  </div>
+        :style="tooltipStyle"
+        role="tooltip"
+        @pointerenter="cancelClose"
+        @pointerleave="scheduleClose"
+      >
+        <slot name="content">
+          <span v-if="!hasContentSlot">{{ text }}</span>
+        </slot>
+      </div>
+    </Teleport>
+  </span>
 </template>
