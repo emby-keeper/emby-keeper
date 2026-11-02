@@ -334,3 +334,10 @@ dist
 # Vitepress
 docs/.vitepress/dist
 docs/.vitepress/cache
+
+# 面板模式部署 (deploy/panel)
+deploy/panel/.env
+deploy/panel/data/
+
+# 前端本地缓存 (pnpm store)
+frontend/.pnpm-store/
