@@ -29,7 +29,7 @@ Embykeeper 是一个 Emby 影视服务器签到保号的自动执行工具, 它�
 
 4. **便捷的二次开发** - 基于 Pyrogram 开发, 提供了一套便捷的框架来实现新的签到器.
 
-项目支持 Python 运行、Docker 部署或云部署, 且完全开源, 不存储任何密钥或隐私信息, 经两年的开发已经在稳定和安全性方面有一定保证.
+项目提供网页管理面板, 也支持命令行运行与云部署, 且完全开源, 不存储任何密钥或隐私信息, 经两年的开发已经在稳定和安全性方面有一定保证.
 
 ## 声明
 
@@ -43,7 +43,7 @@ Embykeeper 将自动向 Embykeeper Auth Bot ([@embykeeper_auth_bot](https://t.me
 
 ## 安装与使用
 
-Embykeeper 支持 Docker 或 PyPI 安装 (Linux / Windows), 也支持云部署, 请点击下方按钮开始部署:
+Embykeeper 支持 Docker、PyPI 与 Windows 安装包, 也支持云部署, 请点击下方按钮开始部署:
 
 [![Setup Tutorial](https://github.com/emby-keeper/emby-keeper/raw/main/images/setup-button.svg)](https://emby-keeper.github.io/guide/安装指南)
 

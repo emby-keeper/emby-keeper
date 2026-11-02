@@ -1,10 +1,8 @@
 # 从 PyPi 安装
 
-## 配置与部署
+## 安装并用网页管理
 
-Embykeeper 可以在 `python >= 3.8, < 3.11` 运行.
-
-需要通过 [virtualvenv](https://virtualenv.pypa.io/) 进行环境管理和包安装:
+Embykeeper 可以在 `python >= 3.8` 运行. 建议使用 [virtualenv](https://virtualenv.pypa.io/) 进行环境管理和包安装:
 
 ```bash
 python -m venv embykeeper-venv
@@ -12,7 +10,31 @@ python -m venv embykeeper-venv
 pip install embykeeper
 ```
 
-随后, 您需要执行:
+安装包里已经包含已构建的面板界面. 设置数据目录和登录密码后启动:
+
+```bash
+export EMBYKEEPERAPI_BASEDIR="$HOME/embykeeper-data"
+mkdir -p "$EMBYKEEPERAPI_BASEDIR"
+export EK_WEBPASS='your-password'   # 换成自己的密码, 否则面板会拒绝启动
+embykeeper web --host 127.0.0.1
+```
+
+浏览器打开 <http://127.0.0.1:8000>, 用刚才设置的密码登录, 即可添加账号、配置任务并查看日志. 面板会把配置写入数据目录下的 `config.toml`.
+
+之后更新版本:
+
+```bash
+pip install -U embykeeper
+```
+
+## 命令行模式 (旧版)
+
+::: warning 旧版部署方式
+以下为命令行模式 (终端登录、`tmux` 后台运行), 没有网页界面. 若你希望使用图形界面, 请参考上文的网页管理
+或 [**🖥️ 面板模式部署 (推荐)**](/guide/面板模式部署).
+:::
+
+已经安装 Embykeeper 后, 不设置 `EK_WEBPASS`, 直接执行:
 
 ```bash
 embykeeper -i
