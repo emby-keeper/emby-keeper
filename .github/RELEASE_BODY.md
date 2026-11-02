@@ -2,4 +2,4 @@
 
 1.
 
-**Full Changelog**: https://github.com/emby-keeper/emby-keeper/compare/v0.0.0...v8.0.0
+**Full Changelog**: https://github.com/emby-keeper/emby-keeper/compare/v0.0.0...v8.0.1

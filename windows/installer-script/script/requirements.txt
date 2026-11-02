@@ -1,1 +1,1 @@
-embykeeper==8.0.0
+embykeeper==8.0.1
