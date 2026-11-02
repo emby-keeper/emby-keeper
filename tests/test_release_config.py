@@ -187,6 +187,17 @@ class DockerReleaseTests(unittest.TestCase):
                     self.assertEqual(build["file"], "./deploy/panel/Dockerfile")
                     self.assertEqual(build["target"], target)
 
+    def test_huggingface_space_runs_the_panel_on_its_app_port(self):
+        root = Path(__file__).resolve().parents[1]
+        dockerfile = (root / "hf" / "Dockerfile").read_text()
+        self.assertRegex(dockerfile, r"FROM embykeeper/embykeeper:v\d+\.\d+\.\d+")
+        # Huggingface runs the container as UID 1000 and proxies the Space app_port.
+        self.assertIn('CMD ["web", "--port", "1818"]', dockerfile)
+        self.assertIn("EMBYKEEPERAPI_BASEDIR=/data", dockerfile)
+        self.assertIn("chown -R 1000:1000 /data", dockerfile)
+        workflow = yaml.safe_load((root / ".github" / "workflows" / "docker.yml").read_text())
+        self.assertIn("sync-to-hf", workflow["jobs"])
+
     def test_compose_and_user_guide_use_the_published_web_image_without_building(self):
         root = Path(__file__).resolve().parents[1]
         guide = (root / "docs" / "guide" / "面板模式部署.md").read_text(encoding="utf-8")

@@ -40,6 +40,14 @@ if [ -z "${EK_WEBPASS}" ]; then
 fi
 
 echo ">> 数据目录: ${basedir}"
-echo ">> 面板地址: http://<服务器地址>:8000 (容器内端口 8000)"
+port=8000
+previous=""
+for argument in "$@"; do
+    if [ "${previous}" = "--port" ]; then
+        port="${argument}"
+    fi
+    previous="${argument}"
+done
+echo ">> 面板地址: http://<服务器地址>:${port} (容器内端口 ${port})"
 
 exec "embykeeper" "$@"
