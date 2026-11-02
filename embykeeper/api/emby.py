@@ -1,17 +1,15 @@
 import asyncio
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple
-from pathlib import Path
 from urllib.parse import urlparse
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-import tomli as tomllib
-import tomlkit
 from loguru import logger
 from pydantic import BaseModel, Field, ValidationError
 
 from .auth import require_auth
+from .config import _read_config_dict, _write_config_dict
 from .runinfo import _sort_datetime
 from ..cache import cache
 from ..schema import Config, EmbyAccount, format_errors
@@ -56,42 +54,8 @@ class EmbyPlayIdProbePayload(BaseModel):
     play_id: str
 
 
-def _active_config_file():
-    conf_file = getattr(config_manager, "_conf_file", None)
-    if conf_file:
-        return Path(conf_file)
-    return config_manager.basedir / "config.toml"
-
-
-def _config_path():
-    return _active_config_file()
-
-
-def _read_config_dict() -> Dict[str, Any]:
-    cfg_path = _config_path()
-    if not cfg_path.exists():
-        return {}
-    with open(cfg_path, "rb") as file:
-        return tomllib.load(file)
-
-
-def _write_config_dict(cfg: Dict[str, Any]):
-    cfg_path = _config_path()
-    with open(cfg_path, "w", encoding="utf-8") as file:
-        file.write(tomlkit.dumps(cfg))
-    # 写盘后强制同步 config_manager 内存，避免 /runinfo/trigger 等使用 config_manager 的端点
-    # 读到旧账号（依赖 watchdog awatch 触发 reload 不可靠）。
-    try:
-        loop = asyncio.get_running_loop()
-        loop.create_task(config_manager.reload_conf(_active_config_file()))
-    except RuntimeError:
-        # 没有 running loop：watchdog 会兜底
-        pass
-
-
 def _load_config() -> Config:
-    cfg_path = _active_config_file()
-    return Config(**(tomllib.loads(cfg_path.read_text()) if cfg_path.exists() else {}))
+    return Config(**_read_config_dict())
 
 
 def _generate_account_id(existing_ids: Set[str]) -> str:

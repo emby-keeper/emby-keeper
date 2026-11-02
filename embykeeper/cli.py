@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from pathlib import Path
@@ -110,6 +111,74 @@ def print_help(ctx: typer.Context, param: typer.CallbackParam, value: bool):
         return
     typer.echo(ctx.get_help())
     raise typer.Exit()
+
+
+async def _prepare_mongodb_source(mongodb_url: str, config_file: Path = None) -> bool:
+    """Use MongoDB for both the config document and the runtime cache."""
+
+    from .config_source import ConfigSourceError, MongoConfigSource
+    from .schema import Config as CoreConfig
+
+    logger.info("正在连接到 MongoDB, 配置与缓存将全部保存在数据库中.")
+    try:
+        source = MongoConfigSource(mongodb_url)
+        source.check()
+    except ConfigSourceError as exc:
+        logger.error(f"{exc}, 程序将退出.")
+        return False
+
+    config.set_source(source)
+    _migrate_local_state(source, config_file)
+    config.set(CoreConfig(mongodb=mongodb_url))
+    if not await config.reload_conf():
+        return False
+    # A stored document may not carry the connection string, keep the cache on MongoDB.
+    config.mongodb = mongodb_url
+    return True
+
+
+def _migrate_local_state(source, config_file: Path = None, basedir: Path = None) -> None:
+    """Import a leftover file-based config and cache once, on first MongoDB start."""
+
+    from .config_source import ConfigSourceError, FileConfigSource
+    from .schema import Config as CoreConfig
+
+    data_dir = Path(basedir) if basedir else config.basedir
+    try:
+        if not source.read():
+            legacy = Path(config_file) if config_file else data_dir / "config.toml"
+            data = FileConfigSource(legacy).read() if legacy.exists() else {}
+            if data:
+                CoreConfig(**data)
+                source.write(data)
+                logger.info(f'已将 "{legacy}" 中的配置导入 MongoDB.')
+    except ConfigSourceError as exc:
+        logger.warning(f"导入本地配置到 MongoDB 失败: {exc}")
+    except Exception as exc:
+        logger.warning(f"本地配置文件无效, 未导入 MongoDB: {exc}")
+
+    cache_file = data_dir / "cache.json"
+    if not cache_file.exists():
+        return
+    try:
+        if not source.cache_empty():
+            return
+        items = json.loads(cache_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        logger.warning(f'读取 "{cache_file}" 失败, 未导入缓存: {exc}')
+        return
+    except ConfigSourceError as exc:
+        logger.warning(f"检查 MongoDB 缓存失败: {exc}")
+        return
+    if not isinstance(items, dict) or not items:
+        return
+    try:
+        count = source.import_cache(items)
+    except Exception as exc:
+        logger.warning(f"导入本地缓存到 MongoDB 失败: {exc}")
+        return
+    cache_file.rename(cache_file.with_suffix(".json.migrated"))
+    logger.info(f'已将 "{cache_file}" 中的 {count} 条缓存导入 MongoDB.')
 
 
 @app.async_command(
@@ -413,7 +482,11 @@ async def main(
         if not await public_preparation():
             raise typer.Exit(1)
     else:
-        if not await config.reload_conf(config_file):
+        mongodb_url = os.environ.get("EK_MONGODB", "").strip()
+        if mongodb_url:
+            if not await _prepare_mongodb_source(mongodb_url, config_file):
+                raise typer.Exit(1)
+        elif not await config.reload_conf(config_file):
             raise typer.Exit(1)
 
     if api:

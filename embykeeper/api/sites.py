@@ -23,7 +23,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ValidationError
 
 from .auth import require_auth
-from .config import _active_config_file, _read_config_dict, _write_config_dict
+from .config import _config_location, _read_config_dict, _write_config_dict
 from ..schema import (
     CheckinerConfig,
     Config as CoreConfig,
@@ -812,7 +812,7 @@ async def list_custom_sites(_: bool = Depends(require_auth)):
                 for site_type in SITE_TYPES
             },
             "defaults": defaults,
-            "config_file": str(_active_config_file()),
+            "config_file": _config_location(),
         }
     except HTTPException:
         raise

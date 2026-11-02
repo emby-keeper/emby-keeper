@@ -1,6 +1,5 @@
 import os
 from typing import Dict
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -36,22 +35,14 @@ def _module_summary(cfg: Config) -> Dict[str, int]:
     }
 
 
-def _active_config_file() -> Path:
-    conf_file = getattr(config_manager, "_conf_file", None)
-    if conf_file:
-        return Path(conf_file)
-    return config_manager.basedir / "config.toml"
-
-
 @router.get("/system/status")
 async def status(_: bool = Depends(require_auth)):
     try:
         from ..runinfo import RunContext, RunStatus
         from ..cache import cache
-        import tomli as tomllib
+        from .config import _read_config_dict
 
-        cfg_path = _active_config_file()
-        cfg = Config(**(tomllib.loads(cfg_path.read_text()) if cfg_path.exists() else {}))
+        cfg = Config(**_read_config_dict())
         counts = _count_accounts(cfg)
 
         running = []

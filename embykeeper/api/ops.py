@@ -4,12 +4,11 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-import tomli as tomllib
 
 from .auth import require_auth
+from .config import _read_config_dict
 from .runinfo import _sort_datetime
 from .telegram import _infer_checkin_outcome, _get_last_checkin_status
 from ..cache import cache
@@ -20,18 +19,8 @@ from ..schema import Config, EmbyAccount, SubsonicAccount, TelegramAccount
 router = APIRouter()
 
 
-def _active_config_file() -> Path:
-    conf_file = getattr(config_manager, "_conf_file", None)
-    if conf_file:
-        return Path(conf_file)
-    return config_manager.basedir / "config.toml"
-
-
 def _load_config() -> Config:
-    cfg_path = _active_config_file()
-    if not cfg_path.exists():
-        return Config()
-    return Config(**tomllib.loads(cfg_path.read_text()))
+    return Config(**_read_config_dict())
 
 
 def _parse_day(day: Optional[str]) -> datetime:

@@ -3,9 +3,7 @@ from typing import Any, Dict, List, Optional
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
-import tomli as tomllib
 
-import tomlkit
 from pydantic import BaseModel, Field, ValidationError
 
 from ..config import config as config_manager
@@ -456,18 +454,18 @@ def _config_path():
     return _active_config_file()
 
 
+def _config_location() -> str:
+    """Human readable location of the config, which may not be a local file."""
+
+    return config_manager.active_source().describe()
+
+
 def _read_config_dict() -> Dict[str, Any]:
-    cfg_file = _config_path()
-    if not cfg_file.exists():
-        return {}
-    with open(cfg_file, "rb") as f:
-        return tomllib.load(f)
+    return config_manager.active_source().read()
 
 
 def _write_config_dict(cfg: Dict[str, Any]):
-    cfg_file = _config_path()
-    with open(cfg_file, "w", encoding="utf-8") as f:
-        f.write(tomlkit.dumps(cfg))
+    config_manager.active_source().write(cfg)
     # 写盘后强制同步 config_manager 内存（watchdog awatch 不总是触发 reload）
     try:
         loop = asyncio.get_running_loop()

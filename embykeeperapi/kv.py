@@ -1,35 +1,35 @@
-import json
 import logging
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+from .state_store import JsonDocumentStore, _brief
 
 logger = logging.getLogger(__name__)
 
 
 class KVStore:
 
-    def __init__(self, path: Optional[str] = None):
+    def __init__(self, path: Optional[str] = None, collection=None):
         if path is None:
             path = Path.home() / ".embykeeper" / "kv_store.json"
         self.path = Path(path)
+        self._store = JsonDocumentStore(self.path, "kv", collection=collection)
         self._data: Dict[str, Any] = {}
         self._load()
 
     def _load(self):
         try:
-            if self.path.exists():
-                with open(self.path, "r", encoding="utf-8") as f:
-                    self._data = json.load(f)
-                logger.debug(f"KV store loaded from {self.path}")
+            payload = self._store.load()
+            if payload is not None:
+                self._data = payload
+                logger.debug(f"KV store loaded from {self._store.describe()}")
         except Exception as e:
-            logger.warning(f"Failed to load KV store: {e}")
+            logger.warning(f"Failed to load KV store: {_brief(e)}")
             self._data = {}
 
     def _save(self):
         try:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.path, "w", encoding="utf-8") as f:
-                json.dump(self._data, f, ensure_ascii=False, indent=2)
+            self._store.save(self._data)
         except Exception as e:
             logger.error(f"Failed to save KV store: {e}")
 

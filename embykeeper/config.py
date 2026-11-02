@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from appdirs import user_data_dir
 
 from .utils import ProxyBase, deep_update, show_exception
+from .config_source import ConfigSource, ConfigSourceError, FileConfigSource
 from .schema import (
     Config,
     EmbyAccount,
@@ -30,6 +31,7 @@ class ConfigManager(ProxyBase):
         "basedir",
         "_basedir",
         "_conf_file",
+        "_source",
         "_cache",
         "_observer",
         "_callbacks",
@@ -41,6 +43,7 @@ class ConfigManager(ProxyBase):
 
         self._basedir = None
         self._conf_file = conf_file
+        self._source = None
         self._cache = None
         self._observer = None
         self._callbacks = {
@@ -60,6 +63,21 @@ class ConfigManager(ProxyBase):
         self._basedir = Path(value)
         if not self._basedir.is_dir():
             self._basedir.mkdir(parents=True, exist_ok=True)
+
+    def set_source(self, source: ConfigSource):
+        """Persist the config through ``source`` instead of a local file."""
+
+        self._source = source
+        if self._observer:
+            self._observer.cancel()
+            self._observer = None
+
+    def active_source(self) -> ConfigSource:
+        """The source currently backing the config, file based unless changed."""
+
+        if self._source is not None:
+            return self._source
+        return FileConfigSource(self._conf_file or (self.basedir / "config.toml"))
 
     @property
     def __subject__(self):
@@ -579,6 +597,8 @@ class ConfigManager(ProxyBase):
 
     async def reload_conf(self, conf_file=None):
         """Load config from provided file or config.toml at cwd."""
+        if self._source is not None:
+            return await self._reload_from_source()
         cfg_dict = {}
         env_config = os.environ.get(f"EK_CONFIG", None)
         if env_config:
@@ -632,6 +652,21 @@ class ConfigManager(ProxyBase):
                 self._conf_file = conf_file
                 await self.start_observer()
             return True
+
+    async def _reload_from_source(self) -> bool:
+        try:
+            cfg_dict = self._source.read()
+        except ConfigSourceError as exc:
+            logger.error(str(exc))
+            return False
+
+        cfg_model = self.validate_config(cfg_dict)
+        if not cfg_model:
+            return False
+
+        logger.debug(f"当前配置来源: {self._source.describe()}")
+        self.set(cfg_model)
+        return True
 
 
 class CallbackHandle:

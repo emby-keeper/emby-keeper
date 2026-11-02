@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
-import json
+import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from appdirs import user_data_dir
 from pydantic import BaseModel, Field, field_validator
+
+from .state_store import JsonDocumentStore, _brief, mongodb_url
+
+logger = logging.getLogger(__name__)
 
 PRODUCT_NAME = "embykeeper"
 SETTINGS_ENV_PATH = "EMBYKEEPERAPI_SETTINGS_PATH"
@@ -45,31 +49,30 @@ class PanelSettings(BaseModel):
 
 
 class PanelSettingsStore:
-    def __init__(self, path: Optional[Path] = None):
+    def __init__(self, path: Optional[Path] = None, collection=None):
         env_path = os.environ.get(SETTINGS_ENV_PATH)
         self.path = Path(path or env_path or default_settings_path()).expanduser()
+        self._store = JsonDocumentStore(self.path, "settings", collection=collection)
         self._data = PanelSettings()
         self.reload()
 
     def reload(self) -> PanelSettings:
-        if not self.path.exists():
+        try:
+            payload = self._store.load()
+        except Exception as exc:
+            logger.warning(f"Failed to load panel settings: {_brief(exc)}")
+            payload = None
+        if payload is None:
             self._data = PanelSettings()
             return self._data
         try:
-            payload = json.loads(self.path.read_text(encoding="utf-8"))
-            if not isinstance(payload, dict):
-                payload = {}
             self._data = PanelSettings(**payload)
-        except (OSError, ValueError, TypeError):
+        except (TypeError, ValueError):
             self._data = PanelSettings()
         return self._data
 
     def save(self, settings: PanelSettings) -> PanelSettings:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(
-            json.dumps(settings.model_dump(), ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
+        self._store.save(settings.model_dump())
         self._data = settings
         return self._data
 
@@ -110,6 +113,8 @@ class PanelSettingsStore:
             "resolved_backend_config_file": str(config_file),
             "default_backend_basedir": str(default_backend_basedir().resolve()),
             "settings_path": str(self.path),
+            "settings_storage": self._store.describe(),
+            "mongodb": bool(mongodb_url()),
             "env_overrides": {
                 "basedir": bool(os.environ.get(BASEDIR_ENV, "").strip()),
                 "config_file": bool(os.environ.get(CONFIG_FILE_ENV, "").strip()),

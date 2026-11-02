@@ -26,6 +26,7 @@ from .proxy import router as proxy_router
 from .sse import router as sse_router
 from .kv_router import router as kv_router
 from .settings_router import router as settings_router
+from .state_store import check_mongodb
 from .events import register_broadcast_loop, reset_shutdown_event, signal_shutdown, signal_shutdown_async
 
 cli = typer.Typer(help="Embykeeper Panel API server")
@@ -266,6 +267,11 @@ def build_app(allow_origins: List[str] = None) -> FastAPI:
             "backend": pm.status(),
         }
 
+    @app.get("/healthz")
+    async def healthz():
+        # Platform health checks (Koyeb / Render) hit this without credentials.
+        return {"status": "ok"}
+
     # Finally mount proxy that forwards /api/* to backend
     app.include_router(proxy_router)
 
@@ -304,6 +310,12 @@ def _run_server(
     try:
         validate_webpass()
     except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+
+    try:
+        check_mongodb()
+    except RuntimeError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(1) from exc
 
