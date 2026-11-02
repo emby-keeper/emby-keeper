@@ -8,6 +8,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query
 import tomli as tomllib
 import tomlkit
+from loguru import logger
 from pydantic import BaseModel, Field, ValidationError
 
 from .auth import require_auth
@@ -16,6 +17,7 @@ from ..cache import cache
 from ..schema import Config, EmbyAccount, format_errors
 from ..config import config as config_manager
 from ..runinfo import RunContext, RunStatus
+from ..emby.api import Emby, EmbyError
 from ..emby.main import EmbyManager
 
 
@@ -43,6 +45,16 @@ class EmbyAccountPayload(BaseModel):
 
 class EmbySettingsPayload(BaseModel):
     enabled: bool = True
+
+
+class EmbyPlayIdProbePayload(BaseModel):
+    url: str
+    username: str
+    password: str = ''
+    name: Optional[str] = None
+    use_proxy: bool = True
+    cf_challenge: bool = True
+    play_id: str
 
 
 def _active_config_file():
@@ -234,7 +246,8 @@ def _find_account_by_key(account_key: str) -> EmbyAccount:
 
 async def _run_single_account(account: EmbyAccount, description: Optional[str] = None):
     manager = EmbyManager()
-    result = await manager._watch_main([account], instant=True, description=description)
+    test_account = account.model_copy(update={"enabled": True})
+    result = await manager._watch_main([test_account], instant=True, description=description, connect_only=True)
     if result is None:
         raise HTTPException(status_code=500, detail="Failed to start Emby test run")
     return result
@@ -460,9 +473,24 @@ async def get_emby_account_device(key: str = Query(...), _: bool = Depends(requi
 
 
 @router.post("/emby/accounts/test-run")
-async def start_emby_account_test_run(key: str = Query(...), _: bool = Depends(require_auth)):
+async def start_emby_account_test_run(
+    key: Optional[str] = Query(None),
+    payload: Optional[EmbyAccountPayload] = None,
+    _: bool = Depends(require_auth),
+):
     try:
-        account = _find_account_by_key(key)
+        if key:
+            account = _find_account_by_key(key)
+            if payload is not None:
+                payload_data = payload.model_dump(exclude_none=True)
+                if not payload_data.get("password"):
+                    payload_data["password"] = account.password
+                account = EmbyAccount(id=_account_key(account), **payload_data)
+        elif payload is not None:
+            account = EmbyAccount(id=_generate_account_id(set()), **payload.model_dump(exclude_none=True))
+        else:
+            raise HTTPException(status_code=400, detail="key or account payload required")
+
         description = f"Emby 测试运行 - {_account_spec(account)}"
         existing_ids = {ctx.id for ctx in RunContext.list_all()}
         task = asyncio.create_task(_run_single_account(account, description=description))
@@ -491,6 +519,85 @@ async def start_emby_account_test_run(key: str = Query(...), _: bool = Depends(r
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to start emby account test run: {e}")
+
+
+@router.post("/emby/accounts/probe-item")
+async def probe_emby_play_item(
+    payload: EmbyPlayIdProbePayload,
+    key: Optional[str] = Query(None),
+    _: bool = Depends(require_auth),
+):
+    """Log in with the supplied credentials and resolve the given play ID to an item.
+
+    This is the lightweight counterpart of the test-run endpoint: it only verifies
+    that the account can log in and that the configured video ID exists, without
+    actually starting a playback task.
+    """
+    play_id = (payload.play_id or "").strip()
+    if not play_id:
+        raise HTTPException(status_code=400, detail="请先填写播放 ID")
+
+    try:
+        password = payload.password
+        account_id: Optional[str] = None
+
+        if key:
+            existing = _find_account_by_key(key)
+            account_id = _account_key(existing)
+            if not password:
+                password = existing.password
+
+        if not account_id:
+            account_id = _generate_account_id(set())
+
+        account_data: Dict[str, Any] = {
+            "id": account_id,
+            "url": payload.url,
+            "username": payload.username,
+            "password": password,
+            "use_proxy": payload.use_proxy,
+            "cf_challenge": payload.cf_challenge,
+            "play_id": play_id,
+        }
+        if payload.name:
+            account_data["name"] = payload.name
+
+        account = EmbyAccount(**account_data)
+
+        emby = Emby(account)
+        emby.log = logger.bind(server=account.name or emby.hostname, username=account.username)
+
+        if not emby.user_id and not await emby.login():
+            raise HTTPException(status_code=400, detail="登录失败, 无法访问该站点")
+
+        item = await emby.get_item(play_id)
+        if not item or not item.get("Id"):
+            raise HTTPException(status_code=404, detail="未找到该视频项目, 请确认播放 ID 是否正确")
+
+        try:
+            duration_seconds = round(int(item.get("RunTimeTicks") or 0) / 10_000_000)
+        except (TypeError, ValueError):
+            duration_seconds = 0
+
+        return {
+            "success": True,
+            "item": {
+                "id": item.get("Id"),
+                "name": item.get("Name"),
+                "type": item.get("Type"),
+                "series": item.get("SeriesName"),
+                "year": item.get("ProductionYear"),
+                "duration_seconds": duration_seconds,
+            },
+        }
+    except HTTPException:
+        raise
+    except EmbyError as e:
+        raise HTTPException(status_code=400, detail=f"测试播放 ID 失败: {e}")
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=format_errors(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"测试播放 ID 失败: {e}")
 
 
 @router.post("/emby/accounts")
@@ -527,10 +634,13 @@ async def update_emby_account(key: str = Query(...), payload: EmbyAccountPayload
 
         for account in accounts:
             if _account_key(account) == key:
-                payload_data = payload.model_dump(exclude_none=True)
+                payload_data = payload.model_dump(exclude_unset=True)
                 if not payload_data.get('password'):
                     payload_data['password'] = account.password
-                next_account = EmbyAccount(id=_account_key(account), **payload_data)
+                account_data = account.model_dump(exclude_none=False)
+                account_data.update(payload_data)
+                account_data['id'] = _account_key(account)
+                next_account = EmbyAccount(**account_data)
                 next_accounts.append(next_account)
                 updated = True
             else:

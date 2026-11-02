@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
@@ -18,9 +18,9 @@ router = APIRouter()
 
 class ProxySettingsPayload(BaseModel):
     enabled: bool = False
-    scheme: str = Field('socks5', pattern='^(socks5|http)$')
-    hostname: str = ''
-    port: Optional[int] = Field(None, gt=0)
+    scheme: str = Field('http', pattern='^(socks5|http)$')
+    hostname: str = '127.0.0.1'
+    port: Optional[int] = Field(7890, gt=0)
     username: str = ''
     password: str = ''
 
@@ -87,6 +87,10 @@ class SchedulerSettingsPayload(BaseModel):
     subsonic_concurrency: int = Field(1, gt=0)
     registrar_enabled: bool = True
     registrar_concurrency: int = Field(1, gt=0)
+    site_checkiner: Optional[List[str]] = None
+    site_monitor: Optional[List[str]] = None
+    site_messager: Optional[List[str]] = None
+    site_registrar: Optional[List[str]] = None
 
 
 class NetworkSettingsPayload(BaseModel):
@@ -133,9 +137,9 @@ def _serialize_system_settings(model: CoreConfig) -> Dict[str, Any]:
         telegram_use_proxy=bool(model.telegram.use_proxy) if model.telegram else True,
         proxy=ProxySettingsPayload(
             enabled=proxy_enabled,
-            scheme=model.proxy.scheme if proxy_enabled and model.proxy and model.proxy.scheme else 'socks5',
-            hostname=model.proxy.hostname if proxy_enabled and model.proxy and model.proxy.hostname else '',
-            port=model.proxy.port if proxy_enabled and model.proxy else None,
+            scheme=model.proxy.scheme if proxy_enabled and model.proxy and model.proxy.scheme else 'http',
+            hostname=model.proxy.hostname if proxy_enabled and model.proxy and model.proxy.hostname else '127.0.0.1',
+            port=model.proxy.port if proxy_enabled and model.proxy else 7890,
             username=model.proxy.username if proxy_enabled and model.proxy and model.proxy.username else '',
             password=model.proxy.password if proxy_enabled and model.proxy and model.proxy.password else '',
         ),
@@ -240,6 +244,10 @@ def _serialize_scheduler_settings(model: CoreConfig) -> Dict[str, Any]:
         subsonic_concurrency=model.subsonic.concurrency if model.subsonic and model.subsonic.concurrency is not None else 1,
         registrar_enabled=bool(model.registrar.enabled) if model.registrar and model.registrar.enabled is not None else True,
         registrar_concurrency=model.registrar.concurrency if model.registrar and model.registrar.concurrency is not None else 1,
+        site_checkiner=model.site.checkiner if model.site else None,
+        site_monitor=model.site.monitor if model.site else None,
+        site_messager=model.site.messager if model.site else None,
+        site_registrar=model.site.registrar if model.site else None,
     ).model_dump()
 
 
@@ -249,9 +257,9 @@ def _serialize_network_settings(model: CoreConfig) -> Dict[str, Any]:
         telegram_use_proxy=bool(model.telegram.use_proxy) if model.telegram else True,
         proxy=ProxySettingsPayload(
             enabled=proxy_enabled,
-            scheme=model.proxy.scheme if proxy_enabled and model.proxy and model.proxy.scheme else 'socks5',
-            hostname=model.proxy.hostname if proxy_enabled and model.proxy and model.proxy.hostname else '',
-            port=model.proxy.port if proxy_enabled and model.proxy else None,
+            scheme=model.proxy.scheme if proxy_enabled and model.proxy and model.proxy.scheme else 'http',
+            hostname=model.proxy.hostname if proxy_enabled and model.proxy and model.proxy.hostname else '127.0.0.1',
+            port=model.proxy.port if proxy_enabled and model.proxy else 7890,
             username=model.proxy.username if proxy_enabled and model.proxy and model.proxy.username else '',
             password=model.proxy.password if proxy_enabled and model.proxy and model.proxy.password else '',
         ),
@@ -308,6 +316,12 @@ def _build_scheduler_update(payload: SchedulerSettingsPayload) -> Dict[str, Any]
             'enabled': payload.registrar_enabled,
             'concurrency': payload.registrar_concurrency,
         },
+        'site': {
+            'checkiner': payload.site_checkiner,
+            'monitor': payload.site_monitor,
+            'messager': payload.site_messager,
+            'registrar': payload.site_registrar,
+        },
     }
 
 
@@ -331,11 +345,13 @@ def _build_network_update(payload: NetworkSettingsPayload) -> Dict[str, Any]:
     }
 
 
-def _save_partial_settings(update: Dict[str, Any], *, drop_proxy: bool = False):
+def _save_partial_settings(update: Dict[str, Any], *, drop_proxy: bool = False, drop_site: bool = False):
     current = _read_config_dict()
     merged = deep_update(current, update)
     if drop_proxy:
         merged.pop('proxy', None)
+    if drop_site:
+        merged.pop('site', None)
     model = CoreConfig(**merged)
     minimal = model.model_dump(mode='json', exclude_none=True, exclude_unset=True)
     _write_config_dict(minimal)
@@ -482,7 +498,11 @@ async def get_scheduler_settings():
 @router.post('/settings/scheduler')
 async def save_scheduler_settings(payload: SchedulerSettingsPayload):
     try:
-        return _save_partial_settings(_build_scheduler_update(payload))
+        drop_site = all(
+            value is None
+            for value in [payload.site_checkiner, payload.site_monitor, payload.site_messager, payload.site_registrar]
+        )
+        return _save_partial_settings(_build_scheduler_update(payload), drop_site=drop_site)
     except ValidationError as e:
         raise HTTPException(status_code=400, detail=format_errors(e))
     except Exception as e:
