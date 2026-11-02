@@ -35,20 +35,21 @@ class SubsonicManager:
         )
         cache.set(key, history[:30])
 
-    async def _listen_main(self, accounts: List[SubsonicAccount], instant: bool = False):
+    async def _listen_main(self, accounts: List[SubsonicAccount], instant: bool = False, description: Optional[str] = None, connect_only: bool = False):
         if not accounts:
             return None
-        logger.info("开始执行 Subsonic 保活.")
+        logger.info("开始执行 Subsonic 连接测试." if connect_only else "开始执行 Subsonic 保活.")
         tasks = []
         sem = asyncio.Semaphore(config.subsonic.concurrency or 100000)
 
-        ctx = RunContext.prepare(description="使用全局设置的 Subsonic 统一保活")
+        ctx = RunContext.prepare(description=description or "使用全局设置的 Subsonic 统一保活")
         ctx.start(RunStatus.INITIALIZING)
 
         async def watch_wrapper(account: SubsonicAccount, sem):
             async with sem:
                 try:
                     player = SubsonicPlayer(account)
+                    player.log = ctx.bind_logger(player.log)
                 except Exception as e:
                     logger.error(f"初始化失败: {e}")
                     show_exception(e, regular=False)
@@ -61,6 +62,8 @@ class SubsonicManager:
                     subsonic = await player.login()
                     if not subsonic:
                         return account, False
+                    if connect_only:
+                        return account, True
                     await asyncio.sleep(random.uniform(2, 5))
                     return account, await player.play(subsonic)
                 except Exception as e:
@@ -76,7 +79,8 @@ class SubsonicManager:
         successful_accounts = []
         results = await asyncio.gather(*tasks)
         for a, success in results:
-            self._record_listen_result(a, success)
+            if not connect_only:
+                self._record_listen_result(a, success)
             if success:
                 successful_accounts.append(self.get_spec(a))
             else:
@@ -85,17 +89,17 @@ class SubsonicManager:
 
         if fails:
             if len(accounts) == 1:
-                logger.error(f"保活失败: {', '.join(failed_accounts)}")
+                logger.error(f"{'连接测试失败' if connect_only else '保活失败'}: {', '.join(failed_accounts)}")
             else:
-                logger.error(f"保活失败 ({fails}/{len(tasks)}): {', '.join(failed_accounts)}")
-            return ctx.finish(RunStatus.FAIL, f"保活失败")
+                logger.error(f"{'连接测试失败' if connect_only else '保活失败'} ({fails}/{len(tasks)}): {', '.join(failed_accounts)}")
+            return ctx.finish(RunStatus.FAIL, f"连接测试失败" if connect_only else "保活失败")
         if len(accounts) == 1:
-            logger.bind(log=True).info(f"保活成功: {', '.join(successful_accounts)}.")
+            logger.bind(log=True).info(f"{'连接测试成功' if connect_only else '保活成功'}: {', '.join(successful_accounts)}.")
         else:
             logger.bind(log=True).info(
-                f"保活成功 ({len(tasks)}/{len(tasks)}): {', '.join(successful_accounts)}."
+                f"{'连接测试成功' if connect_only else '保活成功'} ({len(tasks)}/{len(tasks)}): {', '.join(successful_accounts)}."
             )
-        return ctx.finish(RunStatus.SUCCESS, f"保活成功")
+        return ctx.finish(RunStatus.SUCCESS, f"连接测试成功" if connect_only else "保活成功")
 
     def __init__(self):
         self._tasks: Dict[str, asyncio.Task] = {}
