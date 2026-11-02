@@ -5,7 +5,7 @@ import pkgutil
 import re
 from functools import lru_cache
 from importlib import import_module
-from typing import List, Type
+from typing import Dict, List, Optional, Type
 
 from loguru import logger
 
@@ -49,6 +49,36 @@ def get_names(type: str, allow_ignore=False) -> List[str]:
         else:
             if (not mn.startswith("_")) and (not mn.startswith("test")):
                 results.append(mn)
+    return results
+
+
+def get_site_class(type: str, name: str) -> Optional[Type]:
+    """获得单个站点的类 (与 get_cls 的查找逻辑保持一致).
+
+    使用 ``vars(module)`` 而不是 ``inspect.getmembers``: 后者会读取模块的所有属性,
+    而部分站点模块的属性会触发懒加载 (config/cache) 从而报错。
+    """
+    sub, suffix = get_spec(type)
+    module = import_module(f"{__telechecker__}.{sub}.{name.lower()}")
+    expected_name = name.replace("_old", "").replace("_", "")
+    for cn, cls in vars(module).items():
+        if inspect.isclass(cls) and (expected_name + suffix).lower() == cn.lower():
+            return cls
+    return None
+
+
+@lru_cache
+def get_display_names(type: str, allow_ignore: bool = True) -> Dict[str, str]:
+    """列出站点标识与显示名称的对应关系, 例如 ``{"cc": "CC公益"}``."""
+    results: Dict[str, str] = {}
+    for name in get_names(type, allow_ignore=allow_ignore):
+        try:
+            cls = get_site_class(type, name)
+            display = getattr(cls, "name", None) if cls is not None else None
+        except Exception:
+            continue
+        if isinstance(display, str) and display:
+            results[name] = display
     return results
 
 

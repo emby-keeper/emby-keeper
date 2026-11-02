@@ -144,9 +144,9 @@ class RegisterManager:
         phone_masked = TelegramAccount.get_phone_masked(account.phone)
 
         sites = []
-        if account.site and account.site.registrar:
+        if account.site and account.site.registrar is not None:
             sites = account.site.registrar
-        elif config.site and config.site.registrar:
+        elif config.site and config.site.registrar is not None:
             sites = config.site.registrar
 
         if not sites:
@@ -184,9 +184,9 @@ class RegisterManager:
                 continue
 
             if site_config.get("times"):
-                scheduler = self._schedule_site_timed(account, site_name, site_config)
-                if scheduler:
-                    self._track_scheduler(f"{account.phone}.{site_name}", scheduler)
+                schedulers = self._schedule_site_timed(account, site_name, site_config)
+                for scheduler_key, scheduler in schedulers:
+                    self._track_scheduler(scheduler_key, scheduler)
                     scheduled = True
             elif site_config.get("interval_minutes"):
                 task = self._schedule_site_interval(account, site_name, site_config)
@@ -197,41 +197,48 @@ class RegisterManager:
 
     def _schedule_site_timed(self, account: TelegramAccount, site_name: str, site_config: dict):
         phone_masked = TelegramAccount.get_phone_masked(account.phone)
-        times = site_config.get("times", [])
-        times_str = ",".join(times)
-        time_range = f"<{times_str}>"
+        raw_times = site_config.get("times", [])
+        times = raw_times if isinstance(raw_times, (list, tuple)) else [raw_times]
+        times = list(dict.fromkeys(str(value).strip() for value in times if str(value).strip()))
+        schedulers = []
 
-        def on_next_time(t: datetime):
-            logger.info(
-                f"下一次 \"{phone_masked}\" 账号 {site_name} 站点的注册将在 {t.strftime('%m-%d %H:%M %p')} 进行."
-            )
-            date_ctx = RunContext.get_or_create(f"registrar.date.{t.strftime('%Y%m%d')}")
-            account_ctx = RunContext.get_or_create(f"registrar.account.{account.phone}")
-            site_ctx = RunContext.get_or_create(f"registrar.site.{site_name}")
-            return RunContext.prepare(
-                description=f"{account.phone} 账号 {site_name} 站点定时注册",
-                parent_ids=[account_ctx.id, date_ctx.id, site_ctx.id],
-            )
+        for index, time_value in enumerate(times):
+            task_key = f"{account.phone}.{site_name}.timed.{index}"
 
-        def func(ctx: RunContext):
-            task_key = f"{account.phone}.{site_name}.timed"
-            task = asyncio.create_task(
-                self._run_single_site(ctx, account, site_name, site_config),
-                name=f"Telegram 注册任务 {task_key}",
-            )
-            log = logger.bind(username=f"@{site_name}", name=f"{phone_masked}")
-            log.info(f"已计划定时抢注任务, 下次运行: {scheduler.next_run.strftime('%Y-%m-%d %H:%M:%S')}")
-            return self._track_task(task_key, task)
+            def on_next_time(t: datetime, scheduled_time: str = time_value):
+                logger.info(
+                    f"下一次 \"{phone_masked}\" 账号 {site_name} 站点的注册将在 {t:%m-%d} {scheduled_time} 进行."
+                )
+                date_ctx = RunContext.get_or_create(f"registrar.date.{t:%Y%m%d}")
+                account_ctx = RunContext.get_or_create(f"registrar.account.{account.phone}")
+                site_ctx = RunContext.get_or_create(f"registrar.site.{site_name}")
+                return RunContext.prepare(
+                    description=f"{account.phone} 账号 {site_name} 站点定时注册 ({scheduled_time})",
+                    parent_ids=[account_ctx.id, date_ctx.id, site_ctx.id],
+                )
 
-        scheduler = Scheduler.from_str(
-            func=func,
-            interval_days="1",
-            time_range=time_range,
-            on_next_time=on_next_time,
-            description=f"{account.phone} 账号 {site_name} 站点定时注册任务",
-            sid=f"registrar.timed.{account.phone}.{site_name}",
-        )
-        return scheduler
+            def func(ctx: RunContext, scheduled_time: str = time_value, key: str = task_key):
+                task = asyncio.create_task(
+                    self._run_single_site(ctx, account, site_name, site_config),
+                    name=f"Telegram 注册任务 {key}",
+                )
+                logger.bind(username=f"@{site_name}", name=f"{phone_masked}").info(
+                    f"已计划定时抢注任务, 执行时间: {scheduled_time}"
+                )
+                return self._track_task(key, task)
+
+            scheduler = Scheduler(
+                func=func,
+                days=1,
+                start_time=time_value,
+                end_time=time_value,
+                on_next_time=on_next_time,
+                description=f"{account.phone} 账号 {site_name} 站点定时注册 ({time_value})",
+                sid=f"registrar.timed.{account.phone}.{site_name}.{index}.{time_value}",
+            )
+            schedulers.append((task_key, scheduler))
+
+        return schedulers
 
     def _schedule_site_interval(self, account: TelegramAccount, site_name: str, site_config: dict):
         interval_minutes = site_config.get("interval_minutes")

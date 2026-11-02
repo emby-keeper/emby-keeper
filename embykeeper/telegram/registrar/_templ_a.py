@@ -22,9 +22,9 @@ class TemplateARegisterConfig(BaseModel):
 class TemplateARegister(BaseBotRegister):
     def __init__(self, client, context=None, retries=None, timeout=None, config=None, **kwargs):
         # 设置基本属性
-        self.bot_username = kwargs.get("bot_username")
+        self.bot_username = kwargs.get("bot_username") or getattr(self.__class__, "bot_username", None)
         self.name = kwargs.get("name", f"@{self.bot_username}")
-        self.templ_name = kwargs.get("templ_name")
+        self.templ_name = kwargs.get("templ_name") or getattr(self.__class__, "templ_name", None)
 
         # 调用父类构造函数
         super().__init__(client, context, retries, timeout, config)
