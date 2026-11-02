@@ -200,7 +200,7 @@ class OCRService:
             # 加载模型
             if not ocr_name:
                 model = DdddOcr(beta=True, show_ad=False)
-                if char_range:
+                if char_range is not None:
                     use_probability = True
                     model.set_ranges(char_range)
             else:
