@@ -10,6 +10,12 @@ export default defineConfig({
   sitemap: {
     hostname: 'https://emby-keeper.github.io',
   },
+  vite: {
+    optimizeDeps: {
+      // 首页终端演示组件: 预先与主应用一起预构建, 避免被单独优化后加载到第二份 Vue
+      include: ['@lehoczky/vue-termynal'],
+    },
+  },
   // vite: {
   //   plugins: [
   //     pagefindPlugin({
@@ -96,9 +102,10 @@ export default defineConfig({
             text: '🐧 Linux 安装',
             collapsed: true,
             items: [
-              { text: '🐳 Docker 部署', link: '/guide/Linux-Docker-部署' },
+              { text: '🖥️ 面板模式部署 (推荐)', link: '/guide/面板模式部署' },
+              { text: '🐳 Docker 部署 (旧版)', link: '/guide/Linux-Docker-部署' },
               {
-                text: '📚 Docker Compose 部署',
+                text: '📚 Docker Compose 部署 (旧版)',
                 link: '/guide/Linux-Docker-Compose-部署',
               },
               { text: '🏗️ 从源码构建', link: '/guide/Linux-从源码构建' },
@@ -109,8 +116,7 @@ export default defineConfig({
             text: '💻 Windows 安装',
             collapsed: true,
             items: [
-              { text: '⌨️ 自动安装脚本', link: '/guide/Windows-通过脚本安装' },
-              { text: '🖱️ 安装包', link: '/guide/Windows-通过安装包安装' },
+              { text: '🖥️ Windows 面板安装', link: '/guide/Windows-面板安装' },
             ],
           },
           { text: '🪐 在线部署', link: '/guide/在线部署' },

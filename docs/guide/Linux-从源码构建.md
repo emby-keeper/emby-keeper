@@ -1,5 +1,39 @@
 # 从源码构建
 
+## 构建并启动网页面板
+
+需要 Python 3.11 和 Node.js 20。拉取源码并构建界面：
+
+```bash
+git clone https://github.com/emby-keeper/emby-keeper.git
+cd emby-keeper
+corepack enable
+corepack prepare pnpm@9.15.9 --activate
+pnpm --dir frontend install --frozen-lockfile
+pnpm --dir frontend run build
+```
+
+安装 Python 依赖并准备数据目录：
+
+```bash
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e .
+export EMBYKEEPERAPI_BASEDIR="$PWD/data"
+mkdir -p "$EMBYKEEPERAPI_BASEDIR"
+touch "$EMBYKEEPERAPI_BASEDIR/config.toml"
+```
+
+将以下 `your-password` 换成自己的登录密码，否则面板会拒绝启动：
+
+```bash
+export EK_WEBPASS='your-password'
+embykeeper web --host 127.0.0.1
+```
+
+浏览器打开 <http://127.0.0.1:8000>。如需从其他设备访问，应通过安全的反向代理或隧道提供 HTTPS 和访问控制。
+
 ## 配置与部署
 
 Embykeeper 可以从源码构建, 首先请拉取并设置环境:

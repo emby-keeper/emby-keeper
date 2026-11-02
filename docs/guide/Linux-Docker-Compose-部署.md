@@ -1,4 +1,10 @@
-# Docker Compose 部署
+# Docker Compose 部署 (旧版)
+
+::: warning 这是旧版部署方式
+本页介绍的是**命令行镜像 + 在线控制台**的部署方式. 若你希望使用图形界面管理签到与保活,
+请直接参考 [**🖥️ 面板模式部署 (推荐)**](/guide/面板模式部署): 一个容器同时提供界面与全部功能,
+且无需先在命令行登录.
+:::
 
 ## 配置与部署
 
@@ -208,14 +214,14 @@ docker-compose up -d
 
 欢迎您在实现签到器后, 通过 [Pull requests](https://github.com/emby-keeper/emby-keeper/pulls) 向 Embykeeper 分享你的成果.
 
-## 部署在线控制台
+## 部署在线控制台 (旧版)
+
+::: warning 不推荐
+在线控制台是「命令行控制台的在线包装」, 并不提供高级美观直观的界面, 且需要先在本机命令行完成登录.
+请优先使用 [**🖥️ 面板模式部署**](/guide/面板模式部署).
+:::
 
 当 `EK_WEBPASS` 环境变量被设定时, 将启动在线控制台, 默认的命令行将不会启动.
-
-::: warning 注意
-自部署不推荐使用在线控制台, 目前的在线控制台实际上是控制台的在线版, 并不提供高级美观直观的界面.
-之后, 我们会考虑在线界面的开发.
-:::
 
 ::: warning 注意
 在自部署模式下, 配置文件不生效, 需要通过环境变量输入配置.
@@ -231,12 +237,14 @@ services:
     image: embykeeper/embykeeper
     restart: unless-stopped
     environment:
-      - EK_WEBPASS=123456
+      - EK_WEBPASS=your-password
     ports:
       - 80:1818
 ```
 
 并运行:
+
+请先将 `your-password` 替换为自己设置的密码，否则程序会拒绝启动。
 
 ```bash
 docker-compose up -d

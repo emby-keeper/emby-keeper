@@ -51,15 +51,31 @@ Embykeeper 支持 Docker 或 PyPI 安装 (Linux / Windows), 也支持云部署, 
 
 [![Deploy to Huggingface Space](https://github.com/emby-keeper/emby-keeper/raw/main/images/deploy-to-hf.svg)](https://huggingface.co/spaces/ekuser/ek?duplicate=true)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[![Tutorial](https://github.com/emby-keeper/emby-keeper/raw/main/images/hf-tutorial.svg)](https://blog.zetx.tech/2024/05/19/embykeeper-hf-tutorial/)
 
-若您有服务器, 我们推荐使用 [Docker 部署](https://emby-keeper.github.io/guide/Linux-Docker-部署):
+Windows 用户可以使用 [Windows 面板安装](https://emby-keeper.github.io/guide/Windows-面板安装)。
+
+若您有服务器, 可以使用 [面板模式部署](https://emby-keeper.github.io/guide/面板模式部署). 必须将下面的 `your-password` 换成自己的登录密码，否则程序会拒绝启动:
+
+```bash
+mkdir -p ~/embykeeper/data
+docker run -d --name embykeeper-panel \
+  --restart unless-stopped \
+  -e EK_WEBPASS='your-password' \
+  -p 8000:8000 \
+  -v "$HOME/embykeeper/data:/app" \
+  embykeeper/embykeeper:latest
+```
+
+之后访问 `http://<服务器地址>:8000`, 即可在界面中完成 Telegram 登录、账号管理与任务配置.
+
+**注意**: 由于近期 Telegram 风控等级上升, 请尽可能先使用服务器所在地区的代理在手机上先登陆一次, 再使用 Embykeeper.
+
+若您更习惯命令行模式, 可以使用旧版的 [Docker 部署](https://emby-keeper.github.io/guide/Linux-Docker-部署):
 
 ```bash
 docker run -v $(pwd)/embykeeper:/app --rm -it --net=host embykeeper/embykeeper -i
 ```
 
-**注意**: 由于近期 Telegram 风控等级上升, 请尽可能先使用服务器所在地区的代理在手机上先登陆一次, 再使用 Embykeeper.
-
-您也可以使用 [Docker Compose 部署](https://emby-keeper.github.io/guide/Linux-Docker-Compose-部署).
+您也可以使用旧版的 [Docker Compose 部署](https://emby-keeper.github.io/guide/Linux-Docker-Compose-部署).
 
 更多安装和配置方面的帮助请参考 [**📖 教程文档**](https://emby-keeper.github.io/).
 
