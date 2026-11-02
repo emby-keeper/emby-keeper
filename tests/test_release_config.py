@@ -1,3 +1,4 @@
+import asyncio
 import copy
 import os
 from pathlib import Path
@@ -351,6 +352,14 @@ class AccountMergeTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ExecutionContractTests(unittest.TestCase):
+    def setUp(self):
+        # Preceding CLI tests call asyncio.run(), which leaves no current loop, and asyncio.Event()
+        # binds to it when constructed on Python 3.8.
+        try:
+            asyncio.get_event_loop()
+        except RuntimeError:
+            asyncio.set_event_loop(asyncio.new_event_loop())
+
     def test_each_registration_time_has_an_independent_fixed_scheduler(self):
         manager = registrar_main.RegisterManager.__new__(registrar_main.RegisterManager)
         account = SimpleNamespace(phone="+12345678901")
