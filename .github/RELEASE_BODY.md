@@ -1,5 +1,3 @@
 ## What's Changed
 
-1.
-
-**Full Changelog**: https://github.com/emby-keeper/emby-keeper/compare/v0.0.0...v8.0.1
+<!-- 提交列表与 Full Changelog 由 .github/workflows/draft-release.yml 自动生成, 需要补充说明时写在这里。 -->

@@ -198,6 +198,19 @@ class DockerReleaseTests(unittest.TestCase):
         workflow = yaml.safe_load((root / ".github" / "workflows" / "docker.yml").read_text())
         self.assertIn("sync-to-hf", workflow["jobs"])
 
+    def test_release_draft_lists_commits_since_the_previous_tag(self):
+        root = Path(__file__).resolve().parents[1]
+        workflow = yaml.safe_load((root / ".github" / "workflows" / "draft-release.yml").read_text())
+        steps = workflow["jobs"]["draft"]["steps"]
+        checkout = next(step for step in steps if step.get("uses", "").startswith("actions/checkout"))
+        self.assertEqual(checkout["with"]["fetch-depth"], 0)
+        script = next(step["run"] for step in steps if "release-notes.md" in step.get("run", ""))
+        self.assertIn("git log --no-merges --pretty=", script)
+        self.assertIn("compare/${previous}...${tag}", script)
+        body = (root / ".github" / "RELEASE_BODY.md").read_text()
+        self.assertNotIn("v0.0.0", body)
+        self.assertNotIn("8.0.1", body)
+
     def test_compose_and_user_guide_use_the_published_web_image_without_building(self):
         root = Path(__file__).resolve().parents[1]
         guide = (root / "docs" / "guide" / "面板模式部署.md").read_text(encoding="utf-8")

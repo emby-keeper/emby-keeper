@@ -15,9 +15,32 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Full history is needed to diff the new tag against the previous release tag.
+          fetch-depth: 0
+      - name: Build release notes
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            tag="${GITHUB_REF_NAME}"
+          else
+            tag="v$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml)"
+          fi
+          previous="$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude '*-dev' "${tag}^" 2>/dev/null || true)"
+          {
+            cat .github/RELEASE_BODY.md
+            echo
+            if [ -n "${previous}" ]; then
+              git log --no-merges --pretty='- %s (%h)' "${previous}..${tag}"
+              echo
+              echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${previous}...${tag}"
+            else
+              echo "- 首次发布"
+            fi
+          } > release-notes.md
+          cat release-notes.md
       - name: Upload Release
         uses: ncipollo/release-action@v1.14.0
         with:
           draft: true
           token: ${{ secrets.GITHUB_TOKEN }}
-          bodyFile: '.github/RELEASE_BODY.md'
+          bodyFile: 'release-notes.md'
