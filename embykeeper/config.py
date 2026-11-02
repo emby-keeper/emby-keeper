@@ -445,8 +445,8 @@ class ConfigManager(ProxyBase):
             {
                 "proxy": {
                     "hostname": "127.0.0.1",
-                    "port": 1080,
-                    "scheme": "socks5",
+                    "port": 7890,
+                    "scheme": "http",
                 }
             }
         )

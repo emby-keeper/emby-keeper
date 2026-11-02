@@ -191,8 +191,8 @@ concurrency = 1
 
 # [proxy]
 # hostname = "127.0.0.1"
-# port = 1080
-# scheme = "socks5" # 可选: http / socks5
+# port = 7890
+# scheme = "http" # 可选: http / socks5
 
 # ================================================================================
 # 日志推送相关设置
