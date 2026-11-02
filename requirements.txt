@@ -37,3 +37,4 @@ python-socks[asyncio]
 apprise
 fastapi
 uvicorn[standard]
+pystray; sys_platform == "win32"
