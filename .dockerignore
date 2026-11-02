@@ -1,3 +1,19 @@
+# ==============================================================================
+# 构建上下文瘦身 (面板镜像与命令行镜像共用)
+# 界面在镜像内单独构建, 因此前端依赖与产物无需进入上下文
+# ==============================================================================
+node_modules/
+frontend/node_modules/
+frontend/.pnpm-store/
+frontend/pnpm-workspace.yaml
+frontend/dist/
+.git/
+.gitignore
+.gitattributes
+*.sif
+sifs/
+deploy/panel/data/
+
 # Configs and outputs
 *.toml
 !/pyproject.toml
@@ -17,9 +33,6 @@
 
 # Utils
 /utils
-
-# Deploys
-/deploy
 
 # Docs
 /images

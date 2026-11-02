@@ -10,7 +10,7 @@ RUN python -m venv /opt/venv \
     && . /opt/venv/bin/activate \
     && pip install --no-cache-dir -U pip setuptools wheel \
     && pip install --no-cache-dir -e . \
-    && ln -s /build/scripts/docker-entrypoint-dev.sh /entrypoint.sh \
+    && ln -s /build/deploy/legacy/entrypoint-dev.sh /entrypoint.sh \
     && chmod +x /entrypoint.sh
 
 WORKDIR /app

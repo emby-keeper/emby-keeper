@@ -4,8 +4,8 @@ services:
     runtime: docker
     plan: free
     branch: stable
-    dockerfilePath: ./deploy/Dockerfile
-    dockerContext: ./deploy/
+    dockerfilePath: ./deploy/cloud/Dockerfile
+    dockerContext: ./deploy/cloud/
     healthCheckPath: /healthz
     envVars:
       - key: EK_WEBPASS

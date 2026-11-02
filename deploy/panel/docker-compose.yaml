@@ -1,0 +1,43 @@
+# Embykeeper 面板模式 (新版部署方式)
+#
+#   1. cp .env.example .env && vi .env    # 将 EK_WEBPASS 的 your-password 换成自己的密码
+#   2. docker compose pull && docker compose up -d
+#   3. 浏览器打开 http://<服务器地址>:8000
+#
+# 全部状态 (config.toml / cache.json / Telegram 会话 / 日志 / 面板自身设置) 都保存在 ./data.
+# 旧版命令行 + 在线控制台部署, 请参考仓库根目录的 docs/guide/Linux-Docker-Compose-部署.md.
+
+services:
+  panel:
+    container_name: embykeeper-panel
+    image: ${EK_PANEL_IMAGE:-embykeeper/embykeeper:latest}
+    restart: unless-stopped
+    # 面板会在收到停止信号后等待被托管的业务后端退出
+    stop_grace_period: 30s
+    # 默认以 root 运行 (与旧版镜像一致); 将 EK_PUID/EK_PGID 设为宿主机用户 (id -u / id -g)
+    # 可让 ./data 中的数据归属该用户, 便于宿主机直接备份与编辑
+    user: "${EK_PUID:-0}:${EK_PGID:-0}"
+    environment:
+      EK_WEBPASS: ${EK_WEBPASS:?请在 .env 中设置面板登录密码 EK_WEBPASS}
+      # 业务配置与用户数据目录 (挂载到 ./data)
+      EMBYKEEPERAPI_BASEDIR: /app
+      # 面板自身状态 (~/.embykeeper) 也落在同一目录, 便于整目录备份
+      HOME: /app
+    ports:
+      - "${EK_PANEL_PORT:-8000}:8000"
+    volumes:
+      - ./data:/app
+    # 若需使用宿主机上的 HTTP/SOCKS 代理, 可在面板「系统设置 - 网络代理」中填写
+    # host.docker.internal 与宿主机代理端口 (例如 host.docker.internal:7890)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/').read()
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
