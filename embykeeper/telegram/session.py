@@ -43,6 +43,84 @@ API_ID = _decode(_id)
 API_HASH = _decode(_hash)
 
 
+def get_telethon_proxy(proxy):
+    if not proxy:
+        return None
+    telethon_proxy = {
+        "proxy_type": proxy.scheme,
+        "addr": proxy.hostname,
+        "port": proxy.port,
+    }
+    if proxy.username:
+        telethon_proxy["username"] = proxy.username
+    if proxy.password:
+        telethon_proxy["password"] = proxy.password
+    return telethon_proxy
+
+
+def build_pyrogram_client_params(
+    name: str,
+    session_string: str,
+    api_id: int,
+    api_hash: str,
+    phone_number: str,
+    *,
+    in_memory: bool,
+    proxy,
+    workdir: str,
+    app_version: str = __version__,
+) -> dict:
+    return {
+        "app_version": app_version,
+        "device_model": "A320MH",
+        "name": name,
+        "system_version": "4.16.30-vxEmby",
+        "api_id": api_id,
+        "api_hash": api_hash,
+        "phone_number": phone_number,
+        "session_string": session_string,
+        "in_memory": in_memory,
+        "proxy": proxy.model_dump() if proxy else None,
+        "workdir": workdir,
+        "sleep_threshold": 120,
+        "workers": 16,
+        "test_mode": var.telegram_test_server,
+    }
+
+
+def is_valid_pyrogram_session_string(session_str: str) -> bool:
+    try:
+        raw = base64.urlsafe_b64decode(session_str + "=" * (-len(session_str) % 4))
+        struct.unpack(Storage.SESSION_STRING_FORMAT, raw)
+        return True
+    except Exception:
+        return False
+
+
+def convert_telethon_session_string(
+    session_str: str, api_id: int, test_mode: bool, user_id: int, is_bot: int
+) -> str:
+    """Convert a telethon session string to the pyrogram session string format."""
+    from telethon.sessions import StringSession
+
+    session = StringSession(session_str)
+    return (
+        base64.urlsafe_b64encode(
+            struct.pack(
+                Storage.SESSION_STRING_FORMAT,
+                session.dc_id,
+                int(api_id),
+                int(bool(test_mode)),
+                session.auth_key.key,
+                user_id,
+                int(is_bot),
+            )
+        )
+        .decode()
+        .rstrip("=")
+    )
+
+
 class ClientsSession:
     pool = {}
     lock = asyncio.Lock()
@@ -199,18 +277,6 @@ class ClientsSession:
         from telethon import TelegramClient
         from telethon.sessions import StringSession
 
-        telethon_proxy = None
-        if self.proxy:
-            telethon_proxy = {
-                "proxy_type": self.proxy.scheme,
-                "addr": self.proxy.hostname,
-                "port": self.proxy.port,
-            }
-            if self.proxy.username:
-                telethon_proxy["username"] = self.proxy.username
-            if self.proxy.password:
-                telethon_proxy["password"] = self.proxy.password
-
         with tempfile.NamedTemporaryFile() as tmp_file:
             client = TelegramClient(
                 tmp_file.name,
@@ -219,7 +285,7 @@ class ClientsSession:
                 system_version="4.16.30-vxEmby",
                 device_model="A320MH",
                 app_version=__version__,
-                proxy=telethon_proxy,
+                proxy=get_telethon_proxy(self.proxy),
             )
 
             if var.telegram_test_server:
@@ -257,23 +323,12 @@ class ClientsSession:
             else:
                 return None
 
-        session = StringSession(session_string)
-        Dt = Storage.SESSION_STRING_FORMAT
-
-        return (
-            base64.urlsafe_b64encode(
-                struct.pack(
-                    Dt,
-                    session.dc_id,
-                    int(account.api_id or API_ID),
-                    int(bool(var.telegram_test_server)),
-                    session.auth_key.key,
-                    user_id,
-                    int(user_bot),
-                )
-            )
-            .decode()
-            .rstrip("=")
+        return convert_telethon_session_string(
+            session_string,
+            int(account.api_id or API_ID),
+            int(bool(var.telegram_test_server)),
+            user_id,
+            int(user_bot),
         )
 
     async def _disconnect_handler(self, client: Client, session: Session):
@@ -349,22 +404,16 @@ class ClientsSession:
                             logger.warning(f'登录账号 "{phone_masked}" 尝试次数超限, 将被跳过.')
                             return None
 
-                client_params = {
-                    "app_version": __version__,
-                    "device_model": "A320MH",
-                    "name": account.phone,
-                    "system_version": "4.16.30-vxEmby",
-                    "api_id": account.api_id or API_ID,
-                    "api_hash": account.api_hash or API_HASH,
-                    "phone_number": account.phone,
-                    "session_string": session_str,
-                    "in_memory": self.in_memory,
-                    "proxy": self.proxy.model_dump() if self.proxy else None,
-                    "workdir": str(self.basedir),
-                    "sleep_threshold": 120,
-                    "workers": 16,
-                    "test_mode": var.telegram_test_server,
-                }
+                client_params = build_pyrogram_client_params(
+                    account.phone,
+                    session_str,
+                    account.api_id or API_ID,
+                    account.api_hash or API_HASH,
+                    account.phone,
+                    in_memory=self.in_memory,
+                    proxy=self.proxy,
+                    workdir=str(self.basedir),
+                )
 
                 try:
                     client = Client(**client_params)
