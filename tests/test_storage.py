@@ -213,3 +213,46 @@ def test_panel_settings_import_legacy_file_once(tmp_path):
     # A second start must not resurrect the file, and MongoDB stays authoritative.
     store.update(backend_basedir="/new")
     assert PanelSettingsStore(path=path, collection=collection).get().backend_basedir == "/new"
+
+
+def _request_with_token(token):
+    from starlette.requests import Request
+
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/api/config",
+        "headers": [(b"authorization", f"Bearer {token}".encode())],
+    }
+    return Request(scope)
+
+
+def test_login_session_survives_restart(tmp_path, monkeypatch):
+    from fastapi import Response
+
+    from embykeeperapi import auth
+
+    monkeypatch.setenv("EK_WEBPASS", "pw")
+    monkeypatch.setattr(auth, "kv_store", KVStore(path=str(tmp_path / "kv.json")))
+
+    response = Response()
+    body = asyncio.run(auth.login({"password": "pw"}, response))
+    token = body["token"]
+    auth.require_auth(_request_with_token(token))
+
+    # A fresh store instance stands in for a restarted panel process.
+    monkeypatch.setattr(auth, "kv_store", KVStore(path=str(tmp_path / "kv.json")))
+    auth.require_auth(_request_with_token(token))
+
+
+def test_expired_login_session_is_rejected(tmp_path, monkeypatch):
+    from embykeeperapi import auth
+
+    store = KVStore(path=str(tmp_path / "kv.json"))
+    monkeypatch.setenv("EK_WEBPASS", "pw")
+    monkeypatch.setattr(auth, "kv_store", store)
+    store.set(auth.SESSION_CACHE_PREFIX + "stale", 1.0)
+
+    with pytest.raises(Exception):
+        auth.require_auth(_request_with_token("stale"))
+    assert auth.SESSION_CACHE_PREFIX + "stale" not in store.keys()

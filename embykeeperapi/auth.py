@@ -1,15 +1,17 @@
 import os
 import secrets
+import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+
+from .kv import kv_store
 
 router = APIRouter()
 
 SESSION_CACHE_PREFIX = "auth.sessions."
 SESSION_COOKIE_NAME = "ek_session"
-
-_sessions = set()
+SESSION_TTL_SECONDS = 30 * 24 * 3600
 
 
 def _get_webpass() -> Optional[str]:
@@ -33,6 +35,26 @@ def _get_token_from_request(request: Request) -> Optional[str]:
     return None
 
 
+def _session_alive(key: str) -> bool:
+    expires = kv_store.get(key)
+    try:
+        deadline = float(expires)
+    except (TypeError, ValueError):
+        if expires is not None:
+            kv_store.delete(key)
+        return False
+    if deadline < time.time():
+        kv_store.delete(key)
+        return False
+    return True
+
+
+def _purge_expired_sessions() -> None:
+    for key in kv_store.keys():
+        if key.startswith(SESSION_CACHE_PREFIX):
+            _session_alive(key)
+
+
 def require_auth(request: Request):
     webpass = _get_webpass()
     if not webpass:
@@ -40,7 +62,7 @@ def require_auth(request: Request):
     token = _get_token_from_request(request)
     if not token:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    if (SESSION_CACHE_PREFIX + token) not in _sessions:
+    if not _session_alive(SESSION_CACHE_PREFIX + token):
         raise HTTPException(status_code=401, detail="Invalid session")
     return True
 
@@ -57,8 +79,9 @@ async def login(payload: dict, response: Response):
     password = str(payload.get("password", ""))
     if password != webpass:
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    _purge_expired_sessions()
     token = secrets.token_urlsafe(24)
-    _sessions.add(SESSION_CACHE_PREFIX + token)
+    kv_store.set(SESSION_CACHE_PREFIX + token, time.time() + SESSION_TTL_SECONDS)
     response.set_cookie(SESSION_COOKIE_NAME, token, httponly=True, samesite="lax")
     return {"token": token}
 
@@ -67,9 +90,7 @@ async def login(payload: dict, response: Response):
 async def logout(request: Request, response: Response):
     token = _get_token_from_request(request)
     if token:
-        key = SESSION_CACHE_PREFIX + token
-        if key in _sessions:
-            _sessions.remove(key)
+        kv_store.delete(SESSION_CACHE_PREFIX + token)
     response.delete_cookie(SESSION_COOKIE_NAME)
     return {"success": True}
 
