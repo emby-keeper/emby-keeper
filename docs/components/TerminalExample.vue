@@ -193,9 +193,8 @@ import {
 
 .v-termynal .vt__line {
   line-height: 1.5;
-  font-family:
-    ui-monospace, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
-    sans-serif;
+  font-family: ui-monospace, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', sans-serif;
   font-size: 14px;
   word-break: break-all;
   overflow-wrap: break-word;

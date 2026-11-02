@@ -103,7 +103,10 @@ export default defineConfig({
             collapsed: true,
             items: [
               { text: '🖥️ 面板模式部署 (推荐)', link: '/guide/面板模式部署' },
-              { text: '🐳 Docker 部署 (旧版)', link: '/guide/Linux-Docker-部署' },
+              {
+                text: '🐳 Docker 部署 (旧版)',
+                link: '/guide/Linux-Docker-部署',
+              },
               {
                 text: '📚 Docker Compose 部署 (旧版)',
                 link: '/guide/Linux-Docker-Compose-部署',
