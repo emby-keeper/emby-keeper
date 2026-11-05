@@ -250,6 +250,21 @@ class WindowsReleaseTests(unittest.TestCase):
         for filename in ("Start-Embykeeper.bat", "install.ps1", "version.txt"):
             self.assertIn(filename, archiving[0]["run"])
 
+    def test_manual_dispatch_publishes_the_installer_and_wheel_for_testing(self):
+        root = Path(__file__).resolve().parents[1]
+        workflow = yaml.safe_load((root / ".github" / "workflows" / "windows.yml").read_text())
+        artifacts = [
+            step
+            for job in workflow["jobs"].values()
+            for step in job["steps"]
+            if step.get("uses", "").startswith("actions/upload-artifact")
+        ]
+        # Both the installer zip and the wheel are downloadable before a release exists.
+        self.assertEqual(len(artifacts), 2)
+        for step in artifacts:
+            self.assertIn("workflow_dispatch", step["if"])
+        self.assertIn("dist/*.whl", artifacts[1]["with"]["path"])
+
     def test_installer_embeds_python_and_falls_back_between_indexes(self):
         root = Path(__file__).resolve().parents[1]
         script = (root / "windows" / "installer-script" / "install.ps1").read_text(encoding="utf-8")
