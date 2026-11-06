@@ -265,6 +265,12 @@ class WindowsReleaseTests(unittest.TestCase):
             self.assertIn("workflow_dispatch", step["if"])
         self.assertIn("dist/*.whl", artifacts[1]["with"]["path"])
 
+    def test_frontend_workspace_manifest_stays_valid_for_the_pinned_pnpm(self):
+        root = Path(__file__).resolve().parents[1]
+        manifest = yaml.safe_load((root / "frontend" / "pnpm-workspace.yaml").read_text())
+        # The workflows and the panel image pin pnpm 9, which rejects a manifest without packages.
+        self.assertEqual(manifest.get("packages"), ["."])
+
     def test_installer_embeds_python_and_falls_back_between_indexes(self):
         root = Path(__file__).resolve().parents[1]
         script = (root / "windows" / "installer-script" / "install.ps1").read_text(encoding="utf-8")

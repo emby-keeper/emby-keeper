@@ -1,3 +1,7 @@
+# pnpm 9 (pinned in the CI workflows and the panel image) requires a non-empty
+# packages list in a workspace manifest; pnpm 10+ can omit it.
+packages:
+  - .
 allowBuilds:
   esbuild: true
   vue-demi: true
