@@ -278,6 +278,7 @@ class WindowsReleaseTests(unittest.TestCase):
         self.assertIn("-embed-amd64.zip", script)
         self.assertIn("https://www.python.org/ftp/python", script)
         self.assertIn("https://registry.npmmirror.com/-/binary/python", script)
+        self.assertIn("https://mirrors.aliyun.com/pypi/get-pip.py", script)
         self.assertLess(script.index("pypi.tuna.tsinghua.edu.cn"), script.index("pypi.org/simple"))
         self.assertIn("your-password", script)
         self.assertNotIn("python-3.8", script)

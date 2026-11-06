@@ -59,7 +59,10 @@ try {
 
     if (-not (Test-Path (Join-Path $pythonDirectory 'Lib/site-packages/pip/__init__.py'))) {
         $getPip = Join-Path $InstallDirectory 'get-pip.py'
-        Download-FirstAvailable @('https://bootstrap.pypa.io/get-pip.py') $getPip
+        Download-FirstAvailable @(
+            'https://bootstrap.pypa.io/get-pip.py',
+            'https://mirrors.aliyun.com/pypi/get-pip.py'
+        ) $getPip
         Install-WithFallback @($getPip, '--no-warn-script-location')
         Remove-Item $getPip
     }
