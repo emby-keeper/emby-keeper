@@ -26,11 +26,11 @@ concurrency = 1
 [[emby.account]] # 第 1 个账号
 
 # 站点域名和端口:
-url = "https://park.com:443"
+url = "https://bowman.com:443"
 
 # 用户名和密码:
-username = "patricia23"
-password = "&3QxkWrzZj"
+username = "rguerra"
+password = "#8XP(f8Pps"
 
 # 模拟观看的随机时长范围 (秒), 可以为单个数字 (120) 或时间范围 ([120, 240]):
 time = [300, 600]
@@ -54,9 +54,9 @@ time = [300, 600]
 
 # 第 2 个账号, 如需使用请将该段取消注释并修改, 也可以添加更多账号.
 # [[emby.account]]
-# url = "https://sanders.com:443"
-# username = "martinezchristopher"
-# password = "&4bSMgD7LN"
+# url = "https://www.rice-carr.com:443"
+# username = "elizabeth57"
+# password = ")h7iUkqj)@"
 # time = [300, 600]
 
 # ================================================================================
@@ -92,7 +92,7 @@ interval_days = 1
 [[telegram.account]] # 第 1 个账号
 
 # 带国家区号的账户手机号, 一般为 "+86..."
-phone = "+8614770346534"
+phone = "+8615168822586"
 
 # 启用机器人签到系列功能, 默认启用, 设置为 false 以禁用:
 checkiner = true
@@ -115,7 +115,7 @@ registrar = false
 
 # 第 2 个账号, 如需使用请将该段取消注释并修改, 也可以添加更多账号.
 # [[telegram.account]]
-# phone = "+8613886523817"
+# phone = "+8617709916136"
 # checkiner = true
 # monitor = false
 # messager = false
@@ -148,7 +148,7 @@ concurrency = 1
 # ================================================================================
 # 站点相关设置
 # 当您需要禁用某些站点时, 请将该段取消注释并修改.
-# 该部分内容是根据 Embykeeper 8.1.0 生成的.
+# 该部分内容是根据 Embykeeper 8.1.1 生成的.
 # 详见: https://emby-keeper.github.io/guide/配置文件#site-子项
 # ================================================================================
 
@@ -238,18 +238,18 @@ concurrency = 1
 # [[subsonic.account]] # 第 1 个账号
 # 
 # # 站点域名和端口:
-# url = "https://bowman.net:443"
+# url = "https://www.sims.com:443"
 # 
 # # 用户名和密码:
-# username = "daniel86"
-# password = "&TCPLbZlm3"
+# username = "hernandezkyle"
+# password = "u29o2LSf#L"
 # 
 # # 模拟观看的随机时长范围 (秒), 可以为单个数字 (120) 或时间范围 ([120, 240]):
 # time = [300, 600]
 # 
 # [[subsonic.account]] # 第 2 个账号
-# url = "https://hernandez-harvey.net:443"
-# username = "daleclark"
-# password = "^+8Q0EMzQT"
+# url = "https://mckenzie.com:443"
+# username = "zreeves"
+# password = "L$hI9vE$yg"
 # time = [300, 600]
 
