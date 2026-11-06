@@ -9,6 +9,9 @@ $ProgressPreference = 'SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $pythonVersion = '3.11.9'
 $pythonDirectory = Join-Path $InstallDirectory "python-$pythonVersion"
+$bundledRuntime = Join-Path $PSScriptRoot 'runtime'
+$useBundledRuntime = -not $PackagePath -and (Test-Path (Join-Path $bundledRuntime 'python.exe'))
+if ($useBundledRuntime) { $pythonDirectory = $bundledRuntime }
 $python = Join-Path $pythonDirectory 'python.exe'
 $pythonWindowless = Join-Path $pythonDirectory 'pythonw.exe'
 $indexes = @('https://pypi.tuna.tsinghua.edu.cn/simple', 'https://pypi.org/simple')
@@ -40,47 +43,52 @@ function Install-WithFallback([string[]]$Arguments) {
 
 try {
     New-Item -ItemType Directory -Force -Path $InstallDirectory | Out-Null
-    if (-not (Test-Path $python)) {
-        $archive = Join-Path $InstallDirectory 'python-embed.zip'
-        $archiveName = "python-$pythonVersion-embed-amd64.zip"
-        Download-FirstAvailable @(
-            "https://www.python.org/ftp/python/$pythonVersion/$archiveName",
-            "https://registry.npmmirror.com/-/binary/python/$pythonVersion/$archiveName"
-        ) $archive
-        Expand-Archive -Path $archive -DestinationPath $pythonDirectory -Force
-        Remove-Item $archive
-    }
-
-    $pathFile = Get-ChildItem $pythonDirectory -Filter 'python*._pth' | Select-Object -First 1
-    if (-not $pathFile) { throw 'The embedded Python path configuration is missing.' }
-    $paths = @(Get-Content $pathFile.FullName | ForEach-Object { $_ -replace '^#\s*import site', 'import site' })
-    if ($paths -notcontains 'Lib\site-packages') { $paths += 'Lib\site-packages' }
-    Set-Content -Path $pathFile.FullName -Value $paths -Encoding Ascii
-
-    if (-not (Test-Path (Join-Path $pythonDirectory 'Lib/site-packages/pip/__init__.py'))) {
-        $getPip = Join-Path $InstallDirectory 'get-pip.py'
-        Download-FirstAvailable @(
-            'https://bootstrap.pypa.io/get-pip.py',
-            'https://mirrors.aliyun.com/pypi/get-pip.py'
-        ) $getPip
-        Install-WithFallback @($getPip, '--no-warn-script-location')
-        Remove-Item $getPip
-    }
-
-    if ($PackagePath) {
-        $package = $PackagePath
-        $version = 'local-test'
+    if ($useBundledRuntime) {
+        $env:EMBYKEEPERAPI_STATIC_DIR = Join-Path $pythonDirectory 'static'
+        $env:PYTHONDONTWRITEBYTECODE = '1'
     } else {
-        $versionFile = Join-Path $PSScriptRoot 'version.txt'
-        if (-not (Test-Path $versionFile)) { throw 'version.txt is missing; use the release ZIP.' }
-        $version = (Get-Content $versionFile -Raw).Trim()
-        if ($version -notmatch '^\d+\.\d+\.\d+([a-zA-Z0-9.]+)?$') { throw 'Invalid release version.' }
-        $package = "embykeeper==$version"
-    }
-    $marker = Join-Path $InstallDirectory 'installed-version.txt'
-    if ($PackagePath -or -not (Test-Path $marker) -or (Get-Content $marker -Raw).Trim() -ne $version) {
-        Install-WithFallback @('-m', 'pip', 'install', '--upgrade', '--no-warn-script-location', $package)
-        Set-Content -Path $marker -Value $version -Encoding Ascii
+        if (-not (Test-Path $python)) {
+            $archive = Join-Path $InstallDirectory 'python-embed.zip'
+            $archiveName = "python-$pythonVersion-embed-amd64.zip"
+            Download-FirstAvailable @(
+                "https://www.python.org/ftp/python/$pythonVersion/$archiveName",
+                "https://registry.npmmirror.com/-/binary/python/$pythonVersion/$archiveName"
+            ) $archive
+            Expand-Archive -Path $archive -DestinationPath $pythonDirectory -Force
+            Remove-Item $archive
+        }
+
+        $pathFile = Get-ChildItem $pythonDirectory -Filter 'python*._pth' | Select-Object -First 1
+        if (-not $pathFile) { throw 'The embedded Python path configuration is missing.' }
+        $paths = @(Get-Content $pathFile.FullName | ForEach-Object { $_ -replace '^#\s*import site', 'import site' })
+        if ($paths -notcontains 'Lib\site-packages') { $paths += 'Lib\site-packages' }
+        Set-Content -Path $pathFile.FullName -Value $paths -Encoding Ascii
+
+        if (-not (Test-Path (Join-Path $pythonDirectory 'Lib/site-packages/pip/__init__.py'))) {
+            $getPip = Join-Path $InstallDirectory 'get-pip.py'
+            Download-FirstAvailable @(
+                'https://bootstrap.pypa.io/get-pip.py',
+                'https://mirrors.aliyun.com/pypi/get-pip.py'
+            ) $getPip
+            Install-WithFallback @($getPip, '--no-warn-script-location')
+            Remove-Item $getPip
+        }
+
+        if ($PackagePath) {
+            $package = $PackagePath
+            $version = 'local-test'
+        } else {
+            $versionFile = Join-Path $PSScriptRoot 'version.txt'
+            if (-not (Test-Path $versionFile)) { throw 'version.txt is missing; use the release ZIP.' }
+            $version = (Get-Content $versionFile -Raw).Trim()
+            if ($version -notmatch '^\d+\.\d+\.\d+([a-zA-Z0-9.]+)?$') { throw 'Invalid release version.' }
+            $package = "embykeeper==$version"
+        }
+        $marker = Join-Path $InstallDirectory 'installed-version.txt'
+        if ($PackagePath -or -not (Test-Path $marker) -or (Get-Content $marker -Raw).Trim() -ne $version) {
+            Install-WithFallback @('-m', 'pip', 'install', '--upgrade', '--no-compile', '--no-warn-script-location', $package)
+            Set-Content -Path $marker -Value $version -Encoding Ascii
+        }
     }
 
     if ($InstallOnly) { exit 0 }

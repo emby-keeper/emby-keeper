@@ -241,7 +241,7 @@ class DockerReleaseTests(unittest.TestCase):
 
 
 class WindowsReleaseTests(unittest.TestCase):
-    def test_release_ships_only_the_online_installer(self):
+    def test_release_keeps_the_online_installer_as_an_alternative(self):
         root = Path(__file__).resolve().parents[1]
         workflow = yaml.safe_load((root / ".github" / "workflows" / "windows.yml").read_text())
         self.assertEqual(set(workflow["jobs"]), {"win-script", "win-validation"})
@@ -259,11 +259,11 @@ class WindowsReleaseTests(unittest.TestCase):
             for step in job["steps"]
             if step.get("uses", "").startswith("actions/upload-artifact")
         ]
-        # Both the installer zip and the wheel are downloadable before a release exists.
-        self.assertEqual(len(artifacts), 2)
+        self.assertEqual(len(artifacts), 3)
         for step in artifacts:
             self.assertIn("workflow_dispatch", step["if"])
         self.assertIn("dist/*.whl", artifacts[1]["with"]["path"])
+        self.assertIn("WIN_PORTABLE_ZIP_NAME", artifacts[2]["with"]["path"])
 
     def test_frontend_workspace_manifest_stays_valid_for_the_pinned_pnpm(self):
         root = Path(__file__).resolve().parents[1]

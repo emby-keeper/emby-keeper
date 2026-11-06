@@ -6,7 +6,8 @@ on:
     types: [released]
 
 env:
-  WIN_SCRIPT_ZIP_NAME: 'embykeeper-win-${{ github.ref_name }}.zip'
+  WIN_SCRIPT_ZIP_NAME: 'embykeeper-win-online-${{ github.ref_name }}.zip'
+  WIN_PORTABLE_ZIP_NAME: 'embykeeper-win-${{ github.ref_name }}.zip'
 
 permissions:
   contents: write
@@ -70,3 +71,34 @@ jobs:
           $python = "$env:RUNNER_TEMP/embykeeper-test/python-3.11.9/python.exe"
           & $python -c "import pystray; from embykeeperapi.app import _resolve_static_dir; p = _resolve_static_dir(); assert p and (p / 'index.html').is_file() and (p / 'tray.ico').is_file()"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build compact portable package
+        shell: pwsh
+        run: |
+          $version = (Select-String '^version = "(.*)"' pyproject.toml).Matches.Groups[1].Value
+          python windows/portable/pack.py --runtime "$env:RUNNER_TEMP/embykeeper-test/python-3.11.9" --installer windows/installer-script --version $version --output "dist/$env:WIN_PORTABLE_ZIP_NAME"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $report = Get-Content "dist/$([IO.Path]::GetFileNameWithoutExtension($env:WIN_PORTABLE_ZIP_NAME)).json" -Raw | ConvertFrom-Json
+          "## Windows portable package`nFiles: $($report.before.files) -> $($report.after.files)`nZIP size: $($report.archive_bytes) bytes" >> $env:GITHUB_STEP_SUMMARY
+      - name: Test the extracted portable package
+        shell: pwsh
+        run: |
+          $portable = "$env:RUNNER_TEMP/embykeeper-portable"
+          Expand-Archive "dist/$env:WIN_PORTABLE_ZIP_NAME" $portable
+          & "$portable/install.ps1" -InstallOnly -InstallDirectory "$env:RUNNER_TEMP/embykeeper-portable-data"
+          & "$portable/runtime/python.exe" windows/portable/verify.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload portable package for manual testing
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.WIN_PORTABLE_ZIP_NAME }}
+          path: |
+            dist/${{ env.WIN_PORTABLE_ZIP_NAME }}
+            dist/*.json
+          compression-level: 0
+      - name: Upload portable package to GitHub Release
+        if: github.event_name == 'release'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: gh release upload "${{ github.ref_name }}" "dist/$env:WIN_PORTABLE_ZIP_NAME" --repo "${{ github.repository }}"

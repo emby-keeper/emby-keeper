@@ -10,13 +10,13 @@
 
 import ast
 import inspect
+import pkgutil
 import textwrap
 from datetime import datetime
 from collections.abc import Iterable, Mapping, MutableMapping, MutableSet, Sequence, Set
 from enum import Enum
 from functools import lru_cache
 from importlib import import_module
-from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Union, get_args, get_origin
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -235,11 +235,11 @@ def _template_module(site_type: str, kind: str):
 def _template_kinds(site_type: str) -> List[str]:
     sub, _ = get_spec(site_type)
     module = import_module(f"embykeeper.telegram.{sub}")
-    directory = Path(module.__path__[0])
-    kinds = []
-    for path in sorted(directory.glob("_templ_*.py")):
-        kinds.append(path.stem[len("_templ_") :])
-    return kinds
+    return sorted(
+        name[len("_templ_") :]
+        for _, name, is_package in pkgutil.iter_modules(module.__path__)
+        if not is_package and name.startswith("_templ_")
+    )
 
 
 # 类型标签的规范原子与固定顺序 (避免出现 str|int / int|Iterable 这类原始注解名)
