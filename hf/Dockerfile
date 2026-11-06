@@ -1,4 +1,4 @@
-FROM embykeeper/embykeeper:v8.1.0
+FROM embykeeper/embykeeper:v8.1.1
 
 # Hugging Face Docker Spaces run the container as UID 1000 and proxy the port
 # declared by ``app_port`` in the Space README (1818 for the upstream Space).
